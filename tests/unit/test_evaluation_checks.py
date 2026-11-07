@@ -181,3 +181,25 @@ def test_summary_aggregates_by_kind_and_counts_fabrication() -> None:
     assert (s.n, s.passed) == (3, 2)
     assert s.by_kind == {"null": (2, 1), "unanswerable": (1, 1)}
     assert (s.null_total, s.null_fabricated, s.null_missed) == (2, 1, 0)
+
+
+def test_pause_between_questions_spaces_out_requests_for_rate_limited_keys() -> None:
+    from datetime import date
+
+    from health_insight_agent.agent.loop import HealthInsightAgent
+    from health_insight_agent.ai.fake_provider import CallbackLLMProvider, text_response
+    from health_insight_agent.evaluation.runner import run_questions
+    from health_insight_agent.tools.base import ToolRegistry
+
+    agent = HealthInsightAgent(
+        CallbackLLMProvider(lambda s, m, t: text_response("x")),
+        ToolRegistry(),
+        today=lambda: date(2026, 11, 7),
+        sink=lambda _l: None,
+    )
+    slept: list[float] = []
+    run_questions(agent, get_questions()[:3], CTX, pause_seconds=20, sleep=slept.append)
+    assert slept == [20, 20]  # 3問なら質問の「間」の2回だけ(最初の前・最後の後には待たない)
+    slept.clear()
+    run_questions(agent, get_questions()[:3], CTX, sleep=slept.append)
+    assert slept == []

@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from uuid import UUID
@@ -123,10 +124,18 @@ def run_questions(
     *,
     user_id: UUID = EVAL_USER_ID,
     repeat: int = 3,
+    pause_seconds: float = 0.0,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> list[QuestionResult]:
-    """各質問を実行して採点する。モデル質問だけは`repeat`回繰り返し、数値の一貫性も測る。"""
+    """各質問を実行して採点する。モデル質問だけは`repeat`回繰り返し、数値の一貫性も測る。
+
+    `pause_seconds`: 質問と質問の間の待機。無料枠のように1分あたりの回数が少ないAPIで、
+    429にならないよう間隔をあけるために使う(Geminiの無料枠は1分5回程度)。
+    """
     out: list[QuestionResult] = []
-    for q in questions:
+    for i, q in enumerate(questions):
+        if i > 0 and pause_seconds > 0:
+            sleep(pause_seconds)
         first = agent.ask(user_id, q.question)
         result = evaluate_question(q, first, ctx)
         if q.kind == "model" and repeat > 1:
