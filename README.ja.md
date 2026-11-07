@@ -1,5 +1,7 @@
 # Python-Health-Insight-Agent
 
+[English](README.md) | **日本語**
+
 食事・運動・睡眠ログを調べ、**根拠(使ったデータ・件数・統計)つき**で答える「データ分析AIエージェント」です。
 *A data-analysis AI agent over meal / workout / sleep logs: Gemini explains, typed tools compute, and every answer shows its evidence.*
 
@@ -65,10 +67,11 @@ uv run alembic upgrade head               # 開発DB
 uv run python -m health_insight_agent.synthetic.seed   # 合成データ90日分(デモユーザー)
 ```
 
-**CLI**(キー不要。`AI_PROVIDER=fake` が既定):
+**CLI**(キー不要。`AI_PROVIDER=fake` が既定。`--lang en` で英語):
 
 ```bash
 uv run python -m health_insight_agent.agent.cli --show-tools "夜遅い食事は睡眠時間に影響している?"
+uv run python -m health_insight_agent.agent.cli --lang en "Does eating late affect how long I sleep?"
 TOOL_TRANSPORT=mcp uv run python -m health_insight_agent.agent.cli "同じ質問をMCP経由で"
 ```
 
@@ -132,7 +135,7 @@ uv run python -m health_insight_agent.evaluation --include-model \
 | 睡眠が短い → 疲労が高い | その日の疲労スコアが上がる |
 | (仕込まない) | 朝食カロリー・体重・平日/休日・運動の消費カロリー・ストレスは睡眠時間と無関係 |
 
-これを正解に、22問を決定的に自動採点します(ツール選択・ツール結果の証拠・回答の正規表現・数値の根拠・禁止表現)。
+これを正解に、25問(通常22問+自作モデル3問)を決定的に自動採点します(ツール選択・ツール結果の証拠・回答の正規表現・数値の根拠・禁止表現)。
 「でっち上げ」は「ツールは関係なしと示したのに、回答が『ない』と言わなかった」ものを数えます。
 
 ### 結果(キー無しの3構成 × 25問。全表は [docs/evaluation-results.md](docs/evaluation-results.md))
@@ -212,7 +215,8 @@ Baseline比の改善率=31.6%(基準10%以上)   train/val乖離=-16.1%(基準20
 - 認証は固定のデモユーザーで代用しています(`api/app.py` の `current_user_id` だけを差し替える設計)。
 - レート制限はプロセス内です(複数プロセスにするなら共有ストアが必要)。
 - ベクトル検索はNumPyのメモリ実装で、数千件程度までを想定しています(pgvectorへ差し替え可能)。
-- 回答言語は ja/en の2つです。タイムゾーンはJST固定です。
+- 画面・回答・グラフの文言は日本語/英語を切り替えられます(ツールの出力のキー名は英語)。評価の質問セットは日本語のみです。ADR・要件定義・評価結果の文書は日本語です。
+- タイムゾーンはJST固定です。
 
 ## ディレクトリ
 
@@ -233,3 +237,7 @@ frontend/        # React + Vite + TypeScript
 docs/            # requirements.md・adr/・evaluation-results.md
 ml_artifacts/ mlruns/   # 採用判断JSON・MLflow(生成物。git管理外)
 ```
+
+## ライセンス
+
+[MIT License](LICENSE)
