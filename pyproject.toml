@@ -8,7 +8,9 @@ dependencies = [
     "alembic>=1.20.1",
     "fastapi>=0.162.1",
     "google-genai>=3.0.0",
+    "lightgbm>=4.7.0",
     "mcp>=2.3.0",
+    "mlflow>=3.18.0",
     "numpy>=2.5.4",
     "psycopg[binary]>=3.3.8",
     "pydantic>=2.14.3",
@@ -44,7 +46,7 @@ strict = true
 plugins = []
 
 [[tool.mypy.overrides]]
-module = ["scipy.*"]
+module = ["scipy.*", "lightgbm.*", "mlflow.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
