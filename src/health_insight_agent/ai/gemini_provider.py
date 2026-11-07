@@ -34,11 +34,8 @@ from health_insight_agent.ai.protocols import (
     ToolCall,
     ToolSpec,
 )
-from health_insight_agent.ai.retry_policy import (
-    DEFAULT_RETRY_POLICY,
-    RETRYABLE_ERRORS,
-    RetryPolicy,
-)
+from health_insight_agent.ai.retry import call_with_retry
+from health_insight_agent.ai.retry_policy import DEFAULT_RETRY_POLICY, RetryPolicy
 from health_insight_agent.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -184,27 +181,13 @@ class GeminiProvider:
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
         contents = _to_contents(messages)
-        last_error: Exception | None = None
-        for attempt in range(1, self._policy.max_attempts + 1):
-            try:
-                return self._call_once(contents, config)
-            except RETRYABLE_ERRORS as e:
-                last_error = e
-                if attempt == self._policy.max_attempts:
-                    break
-                delay = self._policy.delay_seconds(attempt) * self._rng.uniform(
-                    1 - self._policy.jitter_ratio, 1 + self._policy.jitter_ratio
-                )
-                logger.warning(
-                    "Gemini retryable error (%s); attempt %d/%d, retrying in %.2fs",
-                    type(e).__name__,
-                    attempt,
-                    self._policy.max_attempts,
-                    delay,
-                )
-                self._sleep(delay)
-        assert last_error is not None
-        raise last_error
+        return call_with_retry(
+            lambda: self._call_once(contents, config),
+            policy=self._policy,
+            sleep=self._sleep,
+            rng=self._rng,
+            label="Gemini generate",
+        )
 
     def _call_once(
         self, contents: list[types.Content], config: types.GenerateContentConfig

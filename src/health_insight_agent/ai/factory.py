@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from health_insight_agent.ai.protocols import LLMProvider
+from health_insight_agent.ai.protocols import EmbeddingProvider, LLMProvider
 
 
 def build_llm_provider(provider: str, *, model: str | None = None) -> LLMProvider:
@@ -14,3 +14,14 @@ def build_llm_provider(provider: str, *, model: str | None = None) -> LLMProvide
     from health_insight_agent.ai.gemini_provider import GeminiProvider
 
     return GeminiProvider(model=model)
+
+
+def build_embedding_provider(provider: str) -> EmbeddingProvider:
+    """AI_PROVIDER=fake はキー不要のハッシュ埋め込み、それ以外はGemini埋め込み。"""
+    if provider.lower() == "fake":
+        from health_insight_agent.ai.embeddings import HashingEmbeddingProvider
+
+        return HashingEmbeddingProvider()
+    from health_insight_agent.ai.embeddings import GeminiEmbeddingProvider
+
+    return GeminiEmbeddingProvider()

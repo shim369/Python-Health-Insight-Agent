@@ -43,6 +43,8 @@ def _period(question: str, today: date) -> dict[str, str]:
 def _plan(question: str, today: date) -> list[ToolCall]:
     q = question.lower()
     period = _period(question, today)
+    if _has(q, "メモ", "日記", "振り返り", "書いて", "note", "diary"):
+        return [ToolCall("c1", "search_notes", {"query": question, "top_k": 5})]
     if _has(q, "スコア", "score", "おすすめ", "recommend", "改善"):
         return [
             ToolCall("c1", "get_health_score", {}),
@@ -110,6 +112,12 @@ def _summarize(results: list[tuple[str, dict[str, Any]]]) -> str:
         elif name == "get_recommendations":
             for r in d["recommendations"][:3]:
                 lines.append(f"- 提案({r['domain']}): {r['message']}")
+        elif name == "search_notes":
+            lines.append(
+                f"- 振り返りメモ{d['total_notes_indexed']}件から類似{len(d['hits'])}件を検索:"
+            )
+            for h in d["hits"][:3]:
+                lines.append(f"  - {h['date']}(類似度{h['score']}): {h['text'][:60]}")
         elif name == "get_data_overview":
             for t, b in d["tables"].items():
                 lines.append(f"- {t}: {b['count']}件 ({b['first']} 〜 {b['last']})")
