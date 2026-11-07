@@ -20,7 +20,6 @@ from health_insight_agent.ai.protocols import (
     ToolSpec,
 )
 
-_DISCLAIMER = "※これは健康管理の参考情報であり、医療診断・治療の助言ではありません。"
 _TODAY_RE = re.compile(r"today[^0-9]*(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
 
 
@@ -68,12 +67,12 @@ def _plan(question: str, today: date) -> list[ToolCall]:
         ]
     if _has(q, "相関", "関係", "影響", "correlat", "どうなる", "遅め", "夜"):
         x = (
-            "prev_day_late_meal"
+            "prev_day_breakfast_kcal"  # 「朝食」は「食」より先に判定する(部分一致の取り違え防止)
+            if _has(q, "朝食", "breakfast")
+            else "prev_day_late_meal"
             if _has(q, "食", "meal", "eat")
             else "prev_day_evening_high_workout"
             if _has(q, "運動", "workout")
-            else "prev_day_breakfast_kcal"
-            if _has(q, "朝食")
             else "same_day_weight_kg"
             if _has(q, "体重")
             else "is_weekend"
@@ -117,7 +116,6 @@ def _summarize(results: list[tuple[str, dict[str, Any]]]) -> str:
         else:
             lines.append(f"- {name}: {n}件を使用しました。")
     lines.append("わからないこと: 因果関係の断定はできません。件数が少ない結果は参考程度です。")
-    lines.append(_DISCLAIMER)
     return "\n".join(lines)
 
 
