@@ -96,13 +96,27 @@ class DailyJournalRepository(Protocol):
 
 
 class UnitOfWork(Protocol):
-    users: UserRepository
-    sleep_logs: SleepLogRepository
-    meal_logs: MealLogRepository
-    workout_logs: WorkoutLogRepository
-    health_logs: HealthLogRepository
-    weight_logs: WeightLogRepository
-    daily_journals: DailyJournalRepository
+    # 読み取り専用プロパティにする(実装側が具体型のRepositoryを持てるように共変にする)。
+    @property
+    def users(self) -> UserRepository: ...
+
+    @property
+    def sleep_logs(self) -> SleepLogRepository: ...
+
+    @property
+    def meal_logs(self) -> MealLogRepository: ...
+
+    @property
+    def workout_logs(self) -> WorkoutLogRepository: ...
+
+    @property
+    def health_logs(self) -> HealthLogRepository: ...
+
+    @property
+    def weight_logs(self) -> WeightLogRepository: ...
+
+    @property
+    def daily_journals(self) -> DailyJournalRepository: ...
 
     def __enter__(self) -> UnitOfWork: ...
 

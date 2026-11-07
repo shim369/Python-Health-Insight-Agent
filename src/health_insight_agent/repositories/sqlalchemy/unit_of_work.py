@@ -22,6 +22,15 @@ from health_insight_agent.repositories.sqlalchemy.repositories import (
 
 
 class SqlAlchemyUnitOfWork:
+    # UnitOfWork Protocolを満たすため、各Repositoryを属性として宣言する(中身は__enter__で設定)。
+    users: SqlAlchemyUserRepository
+    sleep_logs: SqlAlchemySleepLogRepository
+    meal_logs: SqlAlchemyMealLogRepository
+    workout_logs: SqlAlchemyWorkoutLogRepository
+    health_logs: SqlAlchemyHealthLogRepository
+    weight_logs: SqlAlchemyWeightLogRepository
+    daily_journals: SqlAlchemyDailyJournalRepository
+
     def __init__(self, session_factory: Callable[[], Session], *, read_only: bool = False) -> None:
         self._session_factory = session_factory
         self._read_only = read_only
