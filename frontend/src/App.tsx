@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Locale } from "./api/types";
 import { ChatView } from "./components/ChatView";
-import { LogoMark } from "./components/Icons";
+import { IconPlus, LogoMark } from "./components/Icons";
 import { t } from "./lib/strings";
 
 const LOCALES: { value: Locale; label: string }[] = [
@@ -11,22 +11,34 @@ const LOCALES: { value: Locale; label: string }[] = [
 
 export function App() {
   const [locale, setLocale] = useState<Locale>("ja");
+  // ChatViewのkeyを変えると作り直され、会話がクリアされてトップ(最初の画面)に戻る。
+  const [chatKey, setChatKey] = useState(0);
   const s = t(locale);
   // 読み上げ・ハイフネーション・フォント選択のため、文書の言語も切り替える
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+
+  const backToTop = () => {
+    setChatKey((k) => k + 1);
+    window.scrollTo?.({ top: 0 });
+  };
+
   return (
     <div className="shell">
       <header className="app-header">
-        <div className="brand">
+        <button type="button" className="brand" onClick={backToTop} aria-label={s.backToTop} title={s.backToTop}>
           <LogoMark />
-          <div>
+          <span className="brand-text">
             <h1>{s.title}</h1>
-            <p className="muted">{s.subtitle}</p>
-          </div>
-        </div>
+            <span className="muted">{s.subtitle}</span>
+          </span>
+        </button>
         <div className="header-actions">
+          <button type="button" className="new-chat" onClick={backToTop}>
+            <IconPlus />
+            {s.newChat}
+          </button>
           <span className="badge demo">{s.demoBadge}</span>
           <div className="segmented" role="group" aria-label="Language">
             {LOCALES.map((l) => (
@@ -43,7 +55,7 @@ export function App() {
         </div>
       </header>
       <div className="app">
-        <ChatView locale={locale} />
+        <ChatView key={chatKey} locale={locale} />
       </div>
     </div>
   );

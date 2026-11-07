@@ -170,20 +170,53 @@ button {
   flex-wrap: wrap;
 }
 
+// ロゴ+タイトル全体が「トップに戻る」ボタン
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  border-radius: $radius-sm;
+
+  &:hover .logo-mark {
+    transform: scale(1.05);
+  }
+
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 52ch;
+    font-size: 0.82rem;
+  }
 
   h1 {
     font-size: 1.15rem;
     letter-spacing: -0.01em;
     line-height: 1.2;
   }
+}
 
-  p {
-    font-size: 0.82rem;
-    max-width: 52ch;
+.new-chat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: $radius-pill;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition:
+    border-color 0.2s $ease,
+    color 0.2s $ease;
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent);
   }
 }
 
@@ -197,6 +230,7 @@ button {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
   flex: none;
+  transition: transform 0.2s $ease;
 
   svg {
     width: 22px;

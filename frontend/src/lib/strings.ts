@@ -6,6 +6,8 @@ const ja = {
   heroTitle: "今日は何を調べますか?",
   heroText: "データを調べ、使ったツール・件数・統計とあわせて答えます。わからないことは「わからない」と答えます。",
   demoBadge: "合成データのデモ",
+  newChat: "新しい会話",
+  backToTop: "トップに戻る(会話をクリア)",
   unknownLabel: "わからないこと",
   finding: {
     correlationTitle: "相関の読み取り",
@@ -59,6 +61,8 @@ const en: typeof ja = {
   heroTitle: "What would you like to look into?",
   heroText: "It checks your data and answers together with the tools, record counts and statistics it used. If it cannot tell, it says so.",
   demoBadge: "Synthetic-data demo",
+  newChat: "New chat",
+  backToTop: "Back to top (clears the chat)",
   unknownLabel: "What is unknown",
   finding: {
     correlationTitle: "Reading the correlation",

@@ -40,6 +40,11 @@ export const IconHeart = () => (
     <path d="M3 12h4l2-5 4 10 2-5h6" />
   </Svg>
 );
+export const IconPlus = () => (
+  <Svg size={16}>
+    <path d="M12 5v14M5 12h14" />
+  </Svg>
+);
 export const IconSend = () => (
   <Svg size={20}>
     <path d="M12 19V5M5 12l7-7 7 7" />
