@@ -112,3 +112,47 @@ def test_health_and_meta() -> None:
         "max_tool_calls": 3,
         "demo_user": True,
     }
+
+
+def test_chart_texts_are_returned_in_the_requested_language() -> None:
+    def handler(user_id: UUID, a: _Args) -> ToolOutput:
+        return ToolOutput(
+            data={},
+            rows_used=1,
+            charts=[
+                charts.bar_chart(
+                    charts.tr("睡眠時間", "Sleep duration"),
+                    [(charts.tr("条件に該当", "Matching"), 1.0), ("2026-11-07", 2.0)],
+                    y_label=charts.tr("分", "min"),
+                ),
+                charts.value_card(
+                    charts.tr("予測", "Prediction"),
+                    6.5,
+                    unit=charts.tr("時間", "h"),
+                    label=charts.tr("モデルによる参考値", "Model-based reference value"),
+                ),
+            ],
+        )
+
+    def client_for(script_calls: int) -> TestClient:
+        script = []
+        for _ in range(script_calls):
+            script += [tool_call_response(ToolCall("c1", "t", {})), text_response("x")]
+        agent = HealthInsightAgent(
+            ScriptedLLMProvider(script),
+            ToolRegistry([Tool("t", "d", _Args, handler)]),
+            sink=lambda _l: None,
+        )
+        return TestClient(create_app(settings=SETTINGS, agent=agent, check_db_on_startup=False))
+
+    c = client_for(2)
+    ja = c.post("/api/chat", json={"question": "q", "locale": "ja"}).json()["charts"]
+    en = c.post("/api/chat", json={"question": "q", "locale": "en"}).json()["charts"]
+    assert ja[0]["title"] == "睡眠時間" and en[0]["title"] == "Sleep duration"
+    assert ja[0]["y_label"] == "分" and en[0]["y_label"] == "min"
+    assert [p["x"] for p in ja[0]["series"][0]["points"]] == ["条件に該当", "2026-11-07"]
+    assert [p["x"] for p in en[0]["series"][0]["points"]] == ["Matching", "2026-11-07"]
+    assert (
+        ja[1]["label"] == "モデルによる参考値" and en[1]["label"] == "Model-based reference value"
+    )
+    assert en[1]["unit"] == "h" and "ja" not in str(en)  # 言語キーの辞書は残らない

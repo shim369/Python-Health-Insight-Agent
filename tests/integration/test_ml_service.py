@@ -17,6 +17,7 @@ from health_insight_agent.services.insight_data_service import (
     InsightDataService,
     InvalidRequestError,
 )
+from health_insight_agent.tools import charts
 from health_insight_agent.tools.base import ToolRegistry
 from health_insight_agent.tools.builtin import build_default_registry
 from tests.conftest import FIXED_END_DATE
@@ -146,9 +147,11 @@ def test_predict_tool_marks_the_value_as_a_reference_with_model_quality(tools: A
     assert d["model"]["improvement_vs_baseline"] >= 0.10 and d["model"]["baseline"]
     assert d["predicted_sleep_hours"] == pytest.approx(d["predicted_sleep_minutes"] / 60, abs=0.01)
     assert any("reference value" in n for n in ex.content["evidence"]["notes"])
-    card = ex.charts[0]
-    assert card["kind"] == "value" and card["label"] == "モデルによる参考値"
-    assert "MAE" in card["note"]  # UIにも誤差を併記する
+    ja = charts.localize(ex.charts[0], "ja")
+    en = charts.localize(ex.charts[0], "en")
+    assert ja["kind"] == "value" and ja["label"] == "モデルによる参考値"
+    assert en["label"] == "Model-based reference value"  # 英語UIでも「参考値」と分かる
+    assert "MAE" in ja["note"] and "MAE" in en["note"]  # UIにも誤差を併記する
 
 
 def test_predict_tool_without_a_model_says_so_and_returns_statistics(tools: Any) -> None:

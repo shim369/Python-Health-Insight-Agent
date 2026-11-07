@@ -12,6 +12,7 @@ from uuid import UUID
 from pydantic import Field
 
 from health_insight_agent.ml.features import (
+    FEATURE_LABELS_EN,
     FEATURE_LABELS_JA,
     MEAL_TIMING_FEATURES,  # noqa: F401  (評価で参照する定義の公開)
 )
@@ -20,7 +21,7 @@ from health_insight_agent.ml.service import PredictionConditions, SleepModelServ
 from health_insight_agent.tools import charts
 from health_insight_agent.tools.base import Tool, ToolArgs, ToolOutput
 
-REFERENCE_LABEL = "モデルによる参考値"
+REFERENCE_LABEL = charts.tr("モデルによる参考値", "Model-based reference value")
 DISCLAIMER = (
     "reference value from a small statistical model, not a measurement or medical advice; "
     "always state the model MAE and the improvement vs baseline when you report it"
@@ -101,14 +102,18 @@ def build_model_tools(service: SleepModelService) -> list[Tool]:
             data["predicted_sleep_minutes"] = round(res.predicted_minutes, 1)
             data["predicted_sleep_hours"] = round(res.predicted_minutes / 60, 2)
             mae = d.mae_minutes or 0.0
+            gain = (d.improvement_rate or 0) * 100
             out_charts.append(
                 charts.value_card(
-                    "明日の睡眠時間(予測)",
+                    charts.tr("明日の睡眠時間(予測)", "Tomorrow's sleep duration (prediction)"),
                     round(res.predicted_minutes / 60, 2),
-                    unit="時間",
+                    unit=charts.tr("時間", "h"),
                     label=REFERENCE_LABEL,
-                    note=f"モデルの誤差(MAE)は約{mae:.0f}分。直近平均より"
-                    f"{(d.improvement_rate or 0) * 100:.0f}%良い(Baseline比)",
+                    note=charts.tr(
+                        f"モデルの誤差(MAE)は約{mae:.0f}分。直近平均より{gain:.0f}%良い(Baseline比)",
+                        f"Model error (MAE) is about {mae:.0f} min; {gain:.0f}% better than "
+                        "the baseline",
+                    ),
                 )
             )
         else:
@@ -155,9 +160,18 @@ def build_model_tools(service: SleepModelService) -> list[Tool]:
             ]
             out_charts.append(
                 charts.bar_chart(
-                    "予測に使われた要因の重要度(モデル。因果ではない)",
-                    [(FEATURE_LABELS_JA.get(n, n), round(s, 3)) for n, s in res.factors],
-                    y_label="重要度(合計1)",
+                    charts.tr(
+                        "予測に使われた要因の重要度(モデル。因果ではない)",
+                        "Feature importance used by the model (not causal)",
+                    ),
+                    [
+                        (
+                            charts.tr(FEATURE_LABELS_JA.get(n, n), FEATURE_LABELS_EN.get(n, n)),
+                            round(sh, 3),
+                        )
+                        for n, sh in res.factors
+                    ],
+                    y_label=charts.tr("重要度(合計1)", "Importance (sums to 1)"),
                 )
             )
         else:

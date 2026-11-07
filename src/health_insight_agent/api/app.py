@@ -25,11 +25,12 @@ from health_insight_agent.config import Settings, load_settings
 from health_insight_agent.database.connection import create_db_engine, wait_for_database
 from health_insight_agent.domain.enums import Locale
 from health_insight_agent.logging_config import get_logger
+from health_insight_agent.tools import charts as chart_texts
 
 logger = get_logger(__name__)
 
 
-def _to_response(answer: AgentAnswer) -> schemas.ChatResponse:
+def _to_response(answer: AgentAnswer, locale: str) -> schemas.ChatResponse:
     return schemas.ChatResponse(
         answer=answer.text,
         status=answer.status,  # type: ignore[arg-type]
@@ -44,7 +45,12 @@ def _to_response(answer: AgentAnswer) -> schemas.ChatResponse:
             )
             for t in answer.tool_trace
         ],
-        charts=[schemas.Chart.model_validate(c) for t in answer.tool_trace for c in t.charts],
+        # グラフの文言は{ja,en}の両方を持っているので、利用者の言語で解決して返す
+        charts=[
+            schemas.Chart.model_validate(chart_texts.localize(c, locale))
+            for t in answer.tool_trace
+            for c in t.charts
+        ],
         usage=schemas.UsageInfo(
             input_tokens=answer.usage.input_tokens,
             output_tokens=answer.usage.output_tokens,
@@ -130,6 +136,6 @@ def create_app(
         answer = await run_in_threadpool(
             the_agent.ask, user_id, req.question, locale=Locale(req.locale), history=history
         )
-        return _to_response(answer)
+        return _to_response(answer, req.locale)
 
     return app

@@ -31,7 +31,7 @@ from health_insight_agent.tools import charts
 from health_insight_agent.tools.base import Tool, ToolArgs, ToolOutput, ToolRegistry, iso_jst
 
 MAX_ROWS = 200
-_METRIC_HELP = "; ".join(f"{m.name}={m.label_ja}" for m in METRICS.values())
+_METRIC_HELP = "; ".join(f"{m.name}={m.label_en}" for m in METRICS.values())
 _TIMING_HELP = (
     "TIMING: one row = one wake-up date X. sleep_* = the sleep that ended on morning X; "
     "prev_day_* = meals/workouts of day X-1 (the day BEFORE that sleep, i.e. candidate causes); "
@@ -169,12 +169,12 @@ def build_default_registry(
             notes=["sleep belongs to its wake-up date"],
             charts=[
                 charts.line_chart(
-                    "睡眠時間(起床日ごと)",
+                    charts.tr("睡眠時間(起床日ごと)", "Sleep duration by wake-up date"),
                     [
                         (local_date_of(x.wake_time).isoformat(), float(x.duration_minutes))
                         for x in logs[: a.limit]
                     ],
-                    y_label="分",
+                    y_label=charts.tr("分", "min"),
                 )
             ]
             if rows
@@ -199,7 +199,11 @@ def build_default_registry(
             rows_used=len(rows),
             period=f"{a.start_date}..{a.end_date}",
             charts=[
-                charts.bar_chart("1日の摂取カロリー", _daily_kcal(logs[: a.limit]), y_label="kcal")
+                charts.bar_chart(
+                    charts.tr("1日の摂取カロリー", "Daily calories"),
+                    _daily_kcal(logs[: a.limit]),
+                    y_label="kcal",
+                )
             ]
             if rows
             else [],
@@ -231,7 +235,9 @@ def build_default_registry(
             notes=["intensity is derived (low/moderate/high), not stored"],
             charts=[
                 charts.bar_chart(
-                    "運動セッションの推定消費カロリー",
+                    charts.tr(
+                        "運動セッションの推定消費カロリー", "Estimated kcal per workout session"
+                    ),
                     [
                         (iso_jst(w.performed_at)[:10], round(estimated_kcal(w)))
                         for w in logs[: a.limit]
@@ -276,13 +282,25 @@ def build_default_registry(
             notes=notes,
             charts=[
                 charts.bar_chart(
-                    f"{METRICS[m.metric].label_ja}({METRICS[m.metric].unit})",
+                    charts.tr(
+                        f"{METRICS[m.metric].label_ja}({METRICS[m.metric].unit})",
+                        f"{METRICS[m.metric].label_en} ({METRICS[m.metric].unit})",
+                    ),
                     [
                         (
-                            f"条件に該当 n={m.comparison.group_a.n}",
+                            charts.tr(
+                                f"条件に該当 n={m.comparison.group_a.n}",
+                                f"Matching n={m.comparison.group_a.n}",
+                            ),
                             m.comparison.group_a.mean or 0.0,
                         ),
-                        (f"それ以外 n={m.comparison.group_b.n}", m.comparison.group_b.mean or 0.0),
+                        (
+                            charts.tr(
+                                f"それ以外 n={m.comparison.group_b.n}",
+                                f"Others n={m.comparison.group_b.n}",
+                            ),
+                            m.comparison.group_b.mean or 0.0,
+                        ),
                     ],
                     y_label=METRICS[m.metric].unit,
                 )
@@ -315,10 +333,19 @@ def build_default_registry(
             ],
             charts=[
                 charts.scatter_chart(
-                    f"{METRICS[r.x].label_ja} × {METRICS[r.y].label_ja}",
+                    charts.tr(
+                        f"{METRICS[r.x].label_ja} × {METRICS[r.y].label_ja}",
+                        f"{METRICS[r.x].label_en} × {METRICS[r.y].label_en}",
+                    ),
                     [(p[1], p[2]) for p in r.pairs],
-                    x_label=f"{METRICS[r.x].label_ja}({METRICS[r.x].unit})",
-                    y_label=f"{METRICS[r.y].label_ja}({METRICS[r.y].unit})",
+                    x_label=charts.tr(
+                        f"{METRICS[r.x].label_ja}({METRICS[r.x].unit})",
+                        f"{METRICS[r.x].label_en} ({METRICS[r.x].unit})",
+                    ),
+                    y_label=charts.tr(
+                        f"{METRICS[r.y].label_ja}({METRICS[r.y].unit})",
+                        f"{METRICS[r.y].label_en} ({METRICS[r.y].unit})",
+                    ),
                 )
             ]
             if r.pairs
@@ -346,15 +373,15 @@ def build_default_registry(
             ],
             charts=[
                 charts.bar_chart(
-                    "ヘルススコア(0-100)",
+                    charts.tr("ヘルススコア(0-100)", "Health score (0-100)"),
                     [
-                        ("総合", round(s.overall_score, 1)),
-                        ("栄養", round(s.nutrition.score, 1)),
-                        ("体重", round(s.weight.score, 1)),
-                        ("睡眠", round(s.sleep.score, 1)),
-                        ("運動", round(s.workout.score, 1)),
+                        (charts.tr("総合", "Overall"), round(s.overall_score, 1)),
+                        (charts.tr("栄養", "Nutrition"), round(s.nutrition.score, 1)),
+                        (charts.tr("体重", "Weight"), round(s.weight.score, 1)),
+                        (charts.tr("睡眠", "Sleep"), round(s.sleep.score, 1)),
+                        (charts.tr("運動", "Workout"), round(s.workout.score, 1)),
                     ],
-                    y_label="点",
+                    y_label=charts.tr("点", "points"),
                 )
             ],
         )

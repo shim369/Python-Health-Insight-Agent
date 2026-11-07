@@ -50,6 +50,18 @@ FEATURE_LABELS_JA: dict[str, str] = {
     "sleep_mean_3": "直近3夜の平均睡眠時間",
     "is_weekend": "週末",
 }
+FEATURE_LABELS_EN: dict[str, str] = {
+    "last_meal_hour": "Last meal time",
+    "bedtime_hour": "Bedtime",
+    "meal_to_bed_gap_h": "Time from last meal to bed",
+    "total_kcal": "Previous day total kcal",
+    "workout_kcal": "Previous day workout kcal",
+    "evening_high_workout": "High-intensity workout after 20:00",
+    "workout_intensity": "Previous day workout intensity",
+    "sleep_prev_night_min": "Previous night's sleep",
+    "sleep_mean_3": "Average sleep of the last 3 nights",
+    "is_weekend": "Weekend",
+}
 MEAL_TIMING_FEATURES = frozenset({"last_meal_hour", "meal_to_bed_gap_h"})
 
 

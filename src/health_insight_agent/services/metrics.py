@@ -69,58 +69,116 @@ class DayRow:
 class Metric:
     name: str
     label_ja: str
+    label_en: str
     unit: str
     description: str
     kind: str  # "numeric" | "flag"(0/1)
     getter: Callable[[DayRow], float | None]
 
 
-def _m(name: str, label: str, unit: str, desc: str, kind: str = "numeric") -> Metric:
-    return Metric(name, label, unit, desc, kind, attrgetter(name))
+def _m(
+    name: str, label_ja: str, label_en: str, unit: str, desc: str, kind: str = "numeric"
+) -> Metric:
+    return Metric(name, label_ja, label_en, unit, desc, kind, attrgetter(name))
 
 
 METRICS: dict[str, Metric] = {
     m.name: m
     for m in (
-        _m("sleep_duration_min", "睡眠時間", "分", "その日(起床日)の睡眠時間"),
-        _m("sleep_bedtime_hour", "就寝時刻", "時", "前夜の就寝時刻。24超は日付をまたいだ深夜"),
-        _m("sleep_quality_score", "睡眠の質", "1-4", "主観の質。1=poor 4=excellent"),
-        _m("prev_day_total_kcal", "前日の総カロリー", "kcal", "睡眠の前日の食事の合計"),
-        _m("prev_day_breakfast_kcal", "前日の朝食カロリー", "kcal", "睡眠の前日の朝食"),
-        _m("prev_day_last_meal_hour", "前日の最後の食事時刻", "時", "睡眠の前日の最終食事"),
+        _m("sleep_duration_min", "睡眠時間", "Sleep duration", "分", "その日(起床日)の睡眠時間"),
+        _m(
+            "sleep_bedtime_hour",
+            "就寝時刻",
+            "Bedtime",
+            "時",
+            "前夜の就寝時刻。24超は日付をまたいだ深夜",
+        ),
+        _m(
+            "sleep_quality_score",
+            "睡眠の質",
+            "Sleep quality",
+            "1-4",
+            "主観の質。1=poor 4=excellent",
+        ),
+        _m(
+            "prev_day_total_kcal",
+            "前日の総カロリー",
+            "Previous day total kcal",
+            "kcal",
+            "睡眠の前日の食事の合計",
+        ),
+        _m(
+            "prev_day_breakfast_kcal",
+            "前日の朝食カロリー",
+            "Previous day breakfast kcal",
+            "kcal",
+            "睡眠の前日の朝食",
+        ),
+        _m(
+            "prev_day_last_meal_hour",
+            "前日の最後の食事時刻",
+            "Previous day last meal time",
+            "時",
+            "睡眠の前日の最終食事",
+        ),
         _m(
             "prev_day_meal_to_bed_gap_h",
             "最後の食事から就寝までの時間",
+            "Time from last meal to bed",
             "時間",
             "睡眠の前日の最終食事→その夜の就寝",
         ),
         _m(
             "prev_day_late_meal",
             "遅い食事(就寝3時間以内)",
+            "Late meal (within 3h of bed)",
             "0/1",
             "最後の食事が就寝の3時間以内なら1",
             "flag",
         ),
-        _m("prev_day_workout_kcal", "前日の運動消費カロリー", "kcal", "前日の運動の推定消費"),
+        _m(
+            "prev_day_workout_kcal",
+            "前日の運動消費カロリー",
+            "Previous day workout kcal",
+            "kcal",
+            "前日の運動の推定消費",
+        ),
         _m(
             "prev_day_workout_intensity",
             "前日の運動強度",
+            "Previous day workout intensity",
             "0-3",
             "0=なし 1=低 2=中 3=高(前日の最大)",
         ),
         _m(
             "prev_day_evening_high_workout",
             "前日の夜(20時以降)の高強度運動",
+            "High-intensity workout after 20:00 (previous day)",
             "0/1",
             "前日20時以降に高強度運動をしたら1",
             "flag",
         ),
-        _m("same_day_fatigue_score", "疲労スコア", "1-5", "その日の疲労(高いほど疲れ)"),
-        _m("same_day_stress_score", "ストレススコア", "1-5", "その日のストレス"),
-        _m("same_day_mental_score", "メンタルスコア", "1-5", "その日のメンタル"),
-        _m("same_day_morning_condition", "朝の体調", "1-5", "その日の朝の体調"),
-        _m("same_day_weight_kg", "体重", "kg", "その日の体重"),
-        _m("is_weekend", "週末(起床日が土日)", "0/1", "起床日が土曜か日曜なら1", "flag"),
+        _m(
+            "same_day_fatigue_score",
+            "疲労スコア",
+            "Fatigue score",
+            "1-5",
+            "その日の疲労(高いほど疲れ)",
+        ),
+        _m("same_day_stress_score", "ストレススコア", "Stress score", "1-5", "その日のストレス"),
+        _m("same_day_mental_score", "メンタルスコア", "Mental score", "1-5", "その日のメンタル"),
+        _m(
+            "same_day_morning_condition", "朝の体調", "Morning condition", "1-5", "その日の朝の体調"
+        ),
+        _m("same_day_weight_kg", "体重", "Weight", "kg", "その日の体重"),
+        _m(
+            "is_weekend",
+            "週末(起床日が土日)",
+            "Weekend (wake-up on Sat/Sun)",
+            "0/1",
+            "起床日が土曜か日曜なら1",
+            "flag",
+        ),
     )
 }
 
