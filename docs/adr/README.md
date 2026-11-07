@@ -10,3 +10,5 @@
 | [0006](0006-rag-vectorstore-protocol.md) | RAGはVectorStoreをProtocolにしてNumPyで実装 |
 | [0007](0007-python-3-15-1.md) | Python 3.15.1の採用とmlflowの注意点 |
 | [0008](0008-retry-timeout-20s.md) | Geminiのタイムアウトは20秒(既存は60秒) |
+| [0009](0009-why-llm-plus-custom-model.md) | なぜGeminiと自作モデルを併用するのか |
+| [0010](0010-sleep-model-adoption-and-fallback.md) | 睡眠モデルの採用基準とフォールバック |

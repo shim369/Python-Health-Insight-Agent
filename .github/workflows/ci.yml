@@ -53,7 +53,7 @@ jobs:
 
       # キー無しFakeでの評価。正答率が基準を下回ったら失敗させる(回帰ガード)。
       - name: Offline evaluation (rule-based baseline)
-        run: uv run python -m health_insight_agent.evaluation --config fake-all --min-rate fake-all=0.85
+        run: uv run python -m health_insight_agent.evaluation --include-model --config fake-all --min-rate fake-all=0.85
 
   frontend:
     runs-on: ubuntu-latest
