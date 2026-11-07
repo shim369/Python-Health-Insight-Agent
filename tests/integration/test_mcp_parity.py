@@ -93,7 +93,14 @@ def test_stdio_subprocess_server_returns_the_same_result(
     """本物のMCPサーバーを子プロセス(stdio)で起動して呼ぶ。"""
     uid: UUID = seeded[1]
     ex = McpToolExecutor(
-        stdio_params(extra_env={"MCP_USER_ID": str(uid), "MCP_TODAY": FIXED_END_DATE.isoformat()}),
+        stdio_params(
+            extra_env={
+                "MCP_USER_ID": str(uid),
+                "MCP_TODAY": FIXED_END_DATE.isoformat(),
+                # 子プロセスは.env.testの有無に依存させない(CIには無い)。キー不要のFakeを明示する。
+                "AI_PROVIDER": "fake",
+            }
+        ),
         uid,
         connect_timeout_seconds=60,
     )
