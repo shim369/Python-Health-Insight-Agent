@@ -33,27 +33,36 @@ language they were asked in.
 
 ## Screenshots
 
-All screenshots use **synthetic data** and the **keyless demo LLM** (`AI_PROVIDER=fake`, shown as `fake-rule` in the
-usage chips). A real Gemini answers in its own words but uses the same tools, charts and finding cards.
+All screenshots use **synthetic data**. Images 2–5 are real answers from **Gemini (`gemini-3.6-flash`)**; the start
+screen does not depend on the model; the prediction card (image 6) was captured earlier with the keyless demo LLM
+(`AI_PROVIDER=fake`).
 
-**Start screen** (Japanese UI): suggested questions, a full-width header, the language toggle and the *New chat* button.
+**1. Start screen** (Japanese UI): suggested questions, a full-width header, the language toggle and the *New chat* button.
 
 ![Start screen](docs/images/01-start-ja.jpg)
 
-**Answer with a chart and, right below it, a plain-language finding card**: a strength meter, the correlation `r`, the
-number of records and the reliability; the fixed disclaimer sits inside the bubble and "what is unknown" under it.
+**2. Gemini's answer**: the model chose its own tools; light Markdown (bold, bullets) is rendered, sleep is reported in
+hours, and every number comes from a tool result.
 
-![Scatter chart of late meals versus sleep duration](docs/images/02-chart-ja.jpg)
-![Finding card with strength meter](docs/images/03-finding-card-ja.jpg)
+![Gemini's answer in the chat](docs/images/02-answer-ja-gemini.jpg)
 
-**Group comparison** (English UI): sleep is shown in hours, flag metrics as the share of days, and each row has a verdict.
+**3. The charts its tool calls produced**: scatter plots (two clear groups by last-meal time) and bars in hours.
 
-![Group comparison table](docs/images/04-comparison-en.jpg)
+![Charts produced by the tool calls](docs/images/03-charts-ja-gemini.jpg)
 
-**Prediction from the custom model**: always labelled *Model-based reference value*, with the model's error (MAE) and
-its improvement over the baseline.
+**4. Finding cards right below the charts**: a strength meter, the correlation `r`, the number of records and the
+reliability; then a group comparison table with a verdict per row.
 
-![Predicted sleep with the reference-value label](docs/images/05-prediction-en.jpg)
+![Finding cards and group comparison](docs/images/04-findings-ja-gemini.jpg)
+
+**5. The same in English** (everything, including the card texts and units, switches language):
+
+![Finding cards in English](docs/images/05-findings-en-gemini.jpg)
+
+**6. Prediction from the custom model** (keyless demo LLM): always labelled *Model-based reference value*, with the
+model's error (MAE) and its improvement over the baseline.
+
+![Predicted sleep with the reference-value label](docs/images/06-prediction-en-demo.jpg)
 
 ## Highlights
 
@@ -190,10 +199,16 @@ GEMINI_MODEL=                 # empty = gemini-3.6-flash (stable). Embeddings: G
 uv run python -m health_insight_agent.agent.cli --lang en --show-tools "What did my bad-sleep days have in common?"
 ```
 
-> **Not verified yet**: the Gemini SDK's error classification (429/503 → retry), replaying the function
-> call `thought_signature`, and the embedding response shape follow the official docs and SDK types and are
-> tested against fake clients, but have **not** been exercised with a real key. If the first run shows a
-> mismatch, check `ai/gemini_provider.py` and `ai/embeddings.py`.
+> **Verified with a real key** (2026-11-08, `gemini-3.6-flash`, free tier): function calling with tool results,
+> replaying the `thought_signature`, 429 handling and embeddings all work (the screenshots above are real runs). The
+> real key found one bug, now fixed: `gemini-embedding-2` is multimodal and merges a list of strings into **one**
+> embedding, so each text is sent as its own `Content` (768 dimensions). **Not yet measured:** the full evaluation on Gemini.
+
+> **Free-tier limits**: `gemini-3.6-flash` allows only **5 requests per minute** on the free tier, and one question
+> takes 3–5 requests (each tool round trip is one). Asking quickly therefore hits HTTP 429; the app then says that the
+> rate limit was reached and to wait about a minute (the retry policy only waits 1 s / 2 s, which cannot outlast a
+> per-minute quota). For a smooth experience or for the evaluation, use a paid key, or space the questions out
+> (`--pause`, below).
 
 **Evaluating with a real key** (costs tokens/money):
 
@@ -202,7 +217,7 @@ uv run python -m health_insight_agent.evaluation --list
 uv run python -m health_insight_agent.evaluation --include-model \
   --config gemini-flash-all --config gemini-flash-no-model --config gemini-flash-minimal-prompt \
   --config gemini-flash-typed-only --config gemini-flash-lite-all \
-  --config fake-all --write-docs docs/evaluation-results.md
+  --config fake-all --pause 20 --write-docs docs/evaluation-results.md   # --pause: seconds between questions
 ```
 
 ## Evaluation
@@ -302,7 +317,7 @@ Authentication on integration (REST API + Google OAuth) is an open point in
 
 - Validated on **synthetic data only**; behaviour on real data (gaps, seasonality, routine changes) is untested.
 - Causation is never asserted: the tools return group differences and correlations, without adjusting for confounders.
-- Evaluation and connectivity with a real Gemini key are unmeasured / unverified (see above).
+- Connectivity with a real Gemini key is verified (see above), but the evaluation on Gemini is **not measured**; free-tier rate limits make a full run slow.
 - The sleep model is a synthetic-data pipeline demonstration. On real data it may not be adopted
   because of data volume, gaps or routine changes (it then falls back to statistics). Predictions come
   from a statistical model that ignores confounders; they are not causal.
