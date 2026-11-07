@@ -100,7 +100,8 @@ cd frontend && npm ci && npm run dev      # http://localhost:5173
 The web UI offers: suggested questions, the answer with **charts**, **finding cards** under them, a
 collapsible **"Tools used and results"** panel (arguments, record counts, raw results), per-answer usage chips
 (model, tokens, tool calls, latency), the **"Model-based reference value"** label on predictions, an English /
-Japanese toggle, light and dark themes, and a responsive layout.
+Japanese toggle, a **"New chat" button (or a click on the logo) that clears the chat and returns to the start screen**,
+light and dark themes, and a responsive layout.
 
 **MCP server** (usable from other MCP clients; the user is bound at startup):
 
