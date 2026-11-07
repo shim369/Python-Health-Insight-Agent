@@ -22,8 +22,14 @@ Example questions:
   model returns a **reference value** with its error (MAE) and its improvement over a baseline; if
   the model does not meet its adoption criteria it is simply not used.
 
-The UI, answers, chart labels and the keyless demo LLM all switch between **English and Japanese**
-(language selector in the UI, `--lang` in the CLI, `locale` in the API).
+Statistics appear as plain-language **finding cards right under the chart** (a strength meter, record
+count and reliability), and sleep is shown in **hours** (e.g. 7.5 h) rather than minutes.
+
+The UI, answers, chart labels, finding cards, tool-result texts (health-score findings, model reasons)
+and the keyless demo LLM all switch between **English and Japanese** (language selector in the UI,
+`--lang` in the CLI, `locale` in the API; the language also travels over MCP). Your own data (notes,
+exercise names) stays in the language it was written in, and earlier messages in a chat keep the
+language they were asked in.
 
 ## Highlights
 
