@@ -41,6 +41,8 @@ class ToolOutput:
     rows_used: int
     period: str | None = None
     notes: list[str] = field(default_factory=list)
+    charts: list[dict[str, Any]] = field(default_factory=list)
+    """UI向けグラフ仕様(tools/charts.py)。LLMには渡さない。"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +66,7 @@ class ToolExecution:
     """LLMに返す内容(成功時は{"ok":true,"data":...,"evidence":...}、失敗時は{"ok":false,"error":...})。"""
     duration_ms: float
     rows_used: int = 0
+    charts: list[dict[str, Any]] = field(default_factory=list)
 
 
 def iso_jst(dt: datetime) -> str:
@@ -124,7 +127,12 @@ class ToolRegistry:
     def execute(self, user_id: UUID, name: str, arguments: dict[str, Any]) -> ToolExecution:
         started = time.perf_counter()
 
-        def done(ok: bool, content: dict[str, Any], rows: int = 0) -> ToolExecution:
+        def done(
+            ok: bool,
+            content: dict[str, Any],
+            rows: int = 0,
+            charts: list[dict[str, Any]] | None = None,
+        ) -> ToolExecution:
             return ToolExecution(
                 name=name,
                 arguments=arguments,
@@ -132,6 +140,7 @@ class ToolRegistry:
                 content=content,
                 duration_ms=(time.perf_counter() - started) * 1000,
                 rows_used=rows,
+                charts=charts or [],
             )
 
         tool = self._tools.get(name)
@@ -163,4 +172,4 @@ class ToolRegistry:
         except TypeError:
             logger.exception("tool %s returned non-JSON data", name)
             return done(False, {"ok": False, "error": "internal error while running the tool"})
-        return done(True, content, out.rows_used)
+        return done(True, content, out.rows_used, out.charts)

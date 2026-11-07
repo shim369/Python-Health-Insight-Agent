@@ -151,3 +151,33 @@ def test_invalid_requests_are_errors_for_the_llm_to_fix(env: Any) -> None:
         },
     )
     assert not bad_metric["ok"] and "unknown metric" in bad_metric["error"]
+
+
+def test_tools_attach_charts_without_adding_them_to_llm_content(seeded: Any) -> None:
+    factory, uid, _ = seeded
+    reg = build_default_registry(
+        InsightDataService(factory, clock=lambda: FIXED_END_DATE),
+        LocalHealthInsightService(factory),
+    )
+    args = {"start_date": START, "end_date": END}
+    cmp = reg.execute(
+        uid,
+        "compare_days",
+        {
+            **args,
+            "condition": {"metric": "prev_day_late_meal", "op": "==", "value": 1},
+            "compare_metrics": ["sleep_duration_min"],
+        },
+    )
+    assert cmp.charts[0]["kind"] == "bar" and "charts" not in str(cmp.content)
+    corr = reg.execute(
+        uid,
+        "correlate",
+        {**args, "x_metric": "sleep_duration_min", "y_metric": "same_day_fatigue_score"},
+    )
+    assert corr.charts[0]["kind"] == "scatter"
+    assert len(corr.charts[0]["series"][0]["points"]) == corr.content["data"]["n_pairs"]
+    assert reg.execute(uid, "get_sleep_logs", args).charts[0]["kind"] == "line"
+    assert reg.execute(uid, "get_meal_logs", args).charts[0]["kind"] == "bar"
+    assert reg.execute(uid, "get_workout_logs", args).charts[0]["kind"] == "bar"
+    assert len(reg.execute(uid, "get_health_score", {}).charts[0]["series"][0]["points"]) == 5

@@ -69,6 +69,8 @@ class CorrelationResult:
     y: str
     n_days_in_period: int
     correlation: stats.Correlation
+    pairs: list[tuple[date, float, float]]
+    """(日付, x, y)。グラフ描画用(LLMには渡さない)。"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,14 +184,17 @@ class InsightDataService:
         _check_metric(y)
         rows = self.day_rows(user_id, start, end)
         gx, gy = METRICS[x].getter, METRICS[y].getter
-        pairs = [(a, b) for r in rows if (a := gx(r)) is not None and (b := gy(r)) is not None]
+        pairs = [
+            (r.date, a, b) for r in rows if (a := gx(r)) is not None and (b := gy(r)) is not None
+        ]
         return CorrelationResult(
             start=start,
             end=end,
             x=x,
             y=y,
             n_days_in_period=len(rows),
-            correlation=stats.correlate_pairs([p[0] for p in pairs], [p[1] for p in pairs]),
+            correlation=stats.correlate_pairs([p[1] for p in pairs], [p[2] for p in pairs]),
+            pairs=pairs,
         )
 
     def overview(self, user_id: UUID) -> DataOverview:

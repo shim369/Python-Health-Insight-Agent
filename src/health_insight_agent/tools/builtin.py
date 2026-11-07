@@ -13,6 +13,7 @@ from uuid import UUID
 from pydantic import Field
 
 from health_insight_agent.domain.intensity import estimated_kcal, workout_intensity
+from health_insight_agent.domain.models import MealLog
 from health_insight_agent.local_time import local_date_of
 from health_insight_agent.services import stats
 from health_insight_agent.services.health_insight_service import HealthInsightPort
@@ -22,6 +23,7 @@ from health_insight_agent.services.insight_data_service import (
     InsightDataService,
 )
 from health_insight_agent.services.metrics import METRIC_NAMES, METRICS
+from health_insight_agent.tools import charts
 from health_insight_agent.tools.base import Tool, ToolArgs, ToolOutput, ToolRegistry, iso_jst
 
 MAX_ROWS = 200
@@ -90,6 +92,14 @@ def _enum_metrics(schema: dict[str, Any]) -> None:
             props[k]["enum"] = list(METRIC_NAMES)
 
 
+def _daily_kcal(meals: list[MealLog]) -> list[tuple[str, float]]:
+    totals: dict[str, float] = {}
+    for m in meals:
+        day = local_date_of(m.consumed_at).isoformat()
+        totals[day] = totals.get(day, 0.0) + m.calories
+    return sorted(totals.items())
+
+
 def _comparison_json(c: stats.Comparison) -> dict[str, Any]:
     def g(s: stats.GroupStats) -> dict[str, Any]:
         return {"n": s.n, "mean": _r(s.mean), "std": _r(s.std), "median": _r(s.median)}
@@ -139,6 +149,18 @@ def build_default_registry(data: InsightDataService, health: HealthInsightPort) 
             rows_used=len(rows),
             period=f"{a.start_date}..{a.end_date}",
             notes=["sleep belongs to its wake-up date"],
+            charts=[
+                charts.line_chart(
+                    "睡眠時間(起床日ごと)",
+                    [
+                        (local_date_of(x.wake_time).isoformat(), float(x.duration_minutes))
+                        for x in logs[: a.limit]
+                    ],
+                    y_label="分",
+                )
+            ]
+            if rows
+            else [],
         )
 
     def meal_logs(user_id: UUID, a: _LogArgs) -> ToolOutput:
@@ -158,6 +180,11 @@ def build_default_registry(data: InsightDataService, health: HealthInsightPort) 
             data={"rows": rows, "total": len(logs), "truncated": len(logs) > a.limit},
             rows_used=len(rows),
             period=f"{a.start_date}..{a.end_date}",
+            charts=[
+                charts.bar_chart("1日の摂取カロリー", _daily_kcal(logs[: a.limit]), y_label="kcal")
+            ]
+            if rows
+            else [],
         )
 
     def workout_logs(user_id: UUID, a: _LogArgs) -> ToolOutput:
@@ -184,6 +211,18 @@ def build_default_registry(data: InsightDataService, health: HealthInsightPort) 
             rows_used=len(rows),
             period=f"{a.start_date}..{a.end_date}",
             notes=["intensity is derived (low/moderate/high), not stored"],
+            charts=[
+                charts.bar_chart(
+                    "運動セッションの推定消費カロリー",
+                    [
+                        (iso_jst(w.performed_at)[:10], round(estimated_kcal(w)))
+                        for w in logs[: a.limit]
+                    ],
+                    y_label="kcal",
+                )
+            ]
+            if rows
+            else [],
         )
 
     def compare_days(user_id: UUID, a: _CompareArgs) -> ToolOutput:
@@ -217,6 +256,21 @@ def build_default_registry(data: InsightDataService, health: HealthInsightPort) 
             rows_used=r.n_days_with_condition_data,
             period=f"{a.start_date}..{a.end_date}",
             notes=notes,
+            charts=[
+                charts.bar_chart(
+                    f"{METRICS[m.metric].label_ja}({METRICS[m.metric].unit})",
+                    [
+                        (
+                            f"条件に該当 n={m.comparison.group_a.n}",
+                            m.comparison.group_a.mean or 0.0,
+                        ),
+                        (f"それ以外 n={m.comparison.group_b.n}", m.comparison.group_b.mean or 0.0),
+                    ],
+                    y_label=METRICS[m.metric].unit,
+                )
+                for m in r.metrics
+                if m.comparison.group_a.n and m.comparison.group_b.n
+            ][:6],
         )
 
     def correlate(user_id: UUID, a: _CorrelateArgs) -> ToolOutput:
@@ -241,6 +295,16 @@ def build_default_registry(data: InsightDataService, health: HealthInsightPort) 
                 f"fewer than {stats.MIN_PAIRS_N} pairs => insufficient_data; "
                 f"fewer than {stats.LOW_PAIRS_N} => low reliability",
             ],
+            charts=[
+                charts.scatter_chart(
+                    f"{METRICS[r.x].label_ja} × {METRICS[r.y].label_ja}",
+                    [(p[1], p[2]) for p in r.pairs],
+                    x_label=f"{METRICS[r.x].label_ja}({METRICS[r.x].unit})",
+                    y_label=f"{METRICS[r.y].label_ja}({METRICS[r.y].unit})",
+                )
+            ]
+            if r.pairs
+            else [],
         )
 
     def health_score(user_id: UUID, a: _AsOfArgs) -> ToolOutput:
@@ -261,6 +325,19 @@ def build_default_registry(data: InsightDataService, health: HealthInsightPort) 
             notes=[
                 "windows: meals/sleep/workouts last 7 days, weight last 30 days",
                 "score 0-100 is this app's own guide, not a medical measure",
+            ],
+            charts=[
+                charts.bar_chart(
+                    "ヘルススコア(0-100)",
+                    [
+                        ("総合", round(s.overall_score, 1)),
+                        ("栄養", round(s.nutrition.score, 1)),
+                        ("体重", round(s.weight.score, 1)),
+                        ("睡眠", round(s.sleep.score, 1)),
+                        ("運動", round(s.workout.score, 1)),
+                    ],
+                    y_label="点",
+                )
             ],
         )
 
