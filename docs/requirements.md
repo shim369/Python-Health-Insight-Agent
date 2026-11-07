@@ -1,11 +1,12 @@
-# Python-Health-Insight-Agent 要件定義(Phase 0)
+# Python-Health-Insight-Agent 要件定義(Phase 0 の記録 + 実装結果)
 
 食事・運動・睡眠ログを題材にした「データ分析AIエージェント」。エージェントがデータを調べ、
 根拠(使ったデータ・集計・モデル評価)付きで答える。ポートフォリオとして、
 AI Agent設計 / RAG / MCP / SQL / 自作モデルとの併用 / 評価 / コスト管理を示し、
 将来は既存アプリ(Python-Smart-Health-Intelligence-Platform、以下「既存アプリ」)へ統合できる構成にする。
 
-> 状態: Phase 0 確定。第7章の未決事項は全て推奨案で決定済み(既存アプリは変更しない)。
+> 状態: Phase 0〜9 は実装済み。第1〜9章は**Phase 0時点の要件と決定の記録**で、実装結果と当初案からの変更は第10章にまとめた。
+> 最新の使い方・評価結果は [README](../README.md) / [README.ja.md](../README.ja.md)、設計判断は [ADR](adr/README.md) を参照。
 
 ## 1. 役割分担(最重要の設計原則)
 
@@ -152,3 +153,44 @@ Python-Health-Insight-Agent/
 ## 9. フェーズ計画
 
 ご指示のPhase 1〜9のとおり。各フェーズ末で停止し、報告→「OK」後に`Phase N: 内容`でコミット。
+
+## 10. 実装結果と、当初案からの変更(Phase 9 完了後)
+
+### 10.1 フェーズの実施状況
+
+| Phase | 内容 | 状況 |
+|---|---|---|
+| 0 | 要件整理・既存スキーマの差分報告・Python/依存の確認 | 完了(本書) |
+| 1 | 土台(uv・設定・ORM/Alembic・合成データ・Repository・pytest・Ruff/mypy・CI) | 完了 |
+| 2 | 型付きツールとLLMProvider(Fake+Gemini、RetryPolicy) | 完了 |
+| 3 | エージェントループ(回数上限・エラー処理・使用量ログ)とCLI | 完了 |
+| 4 | FastAPIとReactチャットUI(根拠・グラフ) | 完了 |
+| 5 | RAG(振り返りメモ) | 完了 |
+| 6 | MCPサーバー化と直接/MCPの切替 | 完了 |
+| 7 | ガード付きSQLツール | 完了 |
+| 8 | 評価セット・README・ADR | 完了 |
+| 9 | 自作モデル(睡眠予測)・評価への比較追加 | 完了 |
+| 追加 | 日英の多言語対応、所見カード、時間表示、UIの刷新(SCSS)、MITライセンス | 完了(ADR 0011) |
+
+### 10.2 第7章の決定の結果
+1. 睡眠の仕込み: 案A(就寝時刻の遅れで代用。スキーマ変更なし)。
+2. 運動強度: 派生指標 `intensity`(`domain/intensity.py`)。
+3. Timeout: 20秒(既存は60秒。ADR 0008)。
+4. HealthScore/Recommendation: 移植+`HealthInsightPort`(ADR 0005)。
+5. Python 3.15.1 を採用。mlflowはpyyamlのsdistビルド(ADR 0007)。CIでの確認はpush後。
+6. パッケージ名: `health_insight_agent`。
+7. DB: docker composeのPostgres 16。読み取り専用接続は任意の `READONLY_DATABASE_URL`(README「設定」)。
+
+### 10.3 第8章の構成案からの変更
+- `tools/sql_guard` ではなく、独立パッケージ `readonly_sql/`(guard・executor・schema_doc)にした。
+- 評価は、トップレベルの `evaluation/` ではなく、パッケージ内の `health_insight_agent/evaluation/` にした
+  (テスト・CLIから使うため)。トップレベルの `evaluation/results/` は生成物の保存先(git管理外)。
+- 追加したもの: `analysis/`・`recommendation/`(移植)、`ml/`(睡眠モデル)、`services/findings.py`(所見)、
+  `tools/charts.py`(グラフ仕様)、`tools/model_tools.py`、`tools/sql_tool.py`。
+- 最終的なディレクトリ構成は README の「Layout / ディレクトリ」を参照。
+
+### 10.4 未検証・未決のもの(README「既知の制限」と同じ)
+- Geminiの実キーでの疎通・評価(プリセットとコマンドは用意済み)。
+- GitHub Actions上でのPython 3.15.1(mlflowのビルド)。
+- 統合時の認証(REST API + Google OAuth)。
+- 実データでの睡眠モデルの採用可否。合成データでの結果はパイプラインの動作実証のみ。
