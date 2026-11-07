@@ -1,7 +1,7 @@
 import type { ChatResponse, Locale } from "../api/types";
 import { t } from "../lib/strings";
 import { ChartView } from "./Charts";
-import { IconInfo, IconSpark, IconUser } from "./Icons";
+import { IconHelp, IconInfo, IconSpark, IconUser } from "./Icons";
 import { ToolTrace } from "./ToolTrace";
 
 export interface UiMessage {
@@ -17,6 +17,26 @@ export function splitDisclaimer(text: string): { body: string; disclaimer: strin
   const i = text.lastIndexOf("\n※");
   if (i === -1) return { body: text, disclaimer: null };
   return { body: text.slice(0, i).trimEnd(), disclaimer: text.slice(i).replace(/^\s*※\s*/, "") };
+}
+
+const UNKNOWN_HEAD = /^\s*(わからないこと|分からないこと|What is unknown)\s*[:：]/i;
+
+/** 「わからないこと: …」の段落(続く箇条書きを含む)を本文から切り出す。吹き出しの下に別枠で出すため。 */
+export function splitUnknown(text: string): { body: string; unknown: string | null } {
+  const lines = text.split("\n");
+  let start = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (UNKNOWN_HEAD.test(lines[i])) {
+      start = i;
+      break;
+    }
+  }
+  if (start === -1) return { body: text, unknown: null };
+  let end = start + 1;
+  while (end < lines.length && /^\s*[-・]\s+/.test(lines[end])) end++;
+  const unknown = lines.slice(start, end).join("\n").trim();
+  const body = [...lines.slice(0, start), ...lines.slice(end)].join("\n").trimEnd();
+  return { body, unknown };
 }
 
 /** 「- 」で始まる行は箇条書き、それ以外は段落として描画する(最小限の整形)。 */
@@ -59,12 +79,14 @@ export function MessageBubble({
   const s = t(locale);
   const isUser = message.role === "user";
   const r = message.response;
-  const { body, disclaimer } = splitDisclaimer(message.text);
+  const { body: withUnknown, disclaimer } = splitDisclaimer(message.text);
+  const { body, unknown } = isUser ? { body: withUnknown, unknown: null } : splitUnknown(withUnknown);
   return (
     <article className={`message ${isUser ? "user" : "assistant"}`} aria-label={isUser ? s.you : s.agent}>
       <div className="avatar" aria-hidden="true">
         {isUser ? <IconUser /> : <IconSpark />}
       </div>
+      <div className="message-main">
       <div className="bubble">
         <div className="who">{isUser ? s.you : s.agent}</div>
         {message.error ? (
@@ -106,6 +128,13 @@ export function MessageBubble({
             <span>{Math.round(r.usage.duration_ms)}ms</span>
           </footer>
         ) : null}
+      </div>
+      {unknown ? (
+        <aside className="unknown-note" aria-label={s.unknownLabel}>
+          <IconHelp />
+          <AnswerText text={unknown} />
+        </aside>
+      ) : null}
       </div>
     </article>
   );

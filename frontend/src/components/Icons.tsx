@@ -62,6 +62,12 @@ export const IconInfo = () => (
     <path d="M12 11v5M12 8h.01" />
   </Svg>
 );
+export const IconHelp = () => (
+  <Svg size={15}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01" />
+  </Svg>
+);
 export const IconTool = () => (
   <Svg size={15}>
     <path d="M14.7 6.3a4 4 0 0 0-5 5L3 18l3 3 6.7-6.7a4 4 0 0 0 5-5l-2.4 2.4-2.6-.6-.6-2.6 2.6-2.2Z" />

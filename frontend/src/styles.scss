@@ -386,11 +386,26 @@ button {
   }
 }
 
+// 吹き出しと、その下の補足(わからないこと)を縦に並べる
+.message-main {
+  min-width: 0;
+  flex: 1;
+  max-width: min(100%, 720px);
+
+  .user & {
+    flex: 0 1 auto;
+  }
+}
+
 .bubble {
   min-width: 0;
-  max-width: min(100%, 720px);
+  width: 100%;
   padding: 12px 16px 14px;
   border-radius: $radius-lg;
+
+  .user & {
+    width: auto;
+  }
 
   .who {
     font-size: 0.72rem;
@@ -403,7 +418,6 @@ button {
   .assistant & {
     @include card;
     border-top-left-radius: 6px;
-    flex: 1;
   }
 
   .user & {
@@ -442,6 +456,28 @@ button {
     li::marker {
       color: var(--accent);
     }
+  }
+}
+
+// 吹き出しの下の補足。本文より控えめに、左端を吹き出しにそろえる
+.unknown-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 8px 4px 0 6px;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--muted);
+
+  > svg {
+    flex: none;
+    margin-top: 3px;
+    color: var(--accent-2);
+  }
+
+  .text {
+    flex: 1;
+    min-width: 0;
   }
 }
 
@@ -505,13 +541,17 @@ button {
 // ---------------- グラフ ----------------
 .charts {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  // auto-fit: グラフが1つなら空のトラックが畳まれ、吹き出し内の横幅100%を使う
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  width: 100%;
   gap: 12px;
   margin-top: 14px;
 }
 
 .chart {
   margin: 0;
+  width: 100%;
+  min-width: 0;
   padding: 12px 12px 8px;
   border-radius: $radius;
   border: 1px solid var(--border);
@@ -528,7 +568,6 @@ button {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 220px;
 
   .grid {
     stroke: var(--border);

@@ -79,6 +79,23 @@ describe("ChatView", () => {
     expect(sent).toMatchObject({ question: "睡眠について", locale: "ja", history: [] });
   });
 
+  it("renders the 'what is unknown' paragraph below the bubble, not inside it", async () => {
+    const unknown = "わからないこと: 因果関係の断定はできません。";
+    stubFetch(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ...response, answer: `結果は次のとおりです。\n${unknown}\n\n※ 注意書き` }),
+    }));
+    render(<ChatView locale="ja" />);
+    await userEvent.type(screen.getByLabelText(/質問を入力/), "q");
+    await userEvent.click(screen.getByRole("button", { name: "送信" }));
+    const note = await screen.findByText(unknown);
+    expect(note.closest(".bubble")).toBeNull();
+    expect(note.closest(".unknown-note")).not.toBeNull();
+    expect(screen.getByText("結果は次のとおりです。").closest(".bubble")).not.toBeNull();
+    expect(screen.getByText("注意書き").closest(".bubble")).not.toBeNull(); // 固定の注意書きは吹き出し内
+  });
+
   it("shows a loading indicator and disables input while waiting", async () => {
     let resolve!: (r: Partial<Response>) => void;
     stubFetch(() => new Promise((r) => (resolve = r)));
