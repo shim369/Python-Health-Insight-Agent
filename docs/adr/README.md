@@ -12,3 +12,4 @@
 | [0008](0008-retry-timeout-20s.md) | Geminiのタイムアウトは20秒(既存は60秒) |
 | [0009](0009-why-llm-plus-custom-model.md) | なぜGeminiと自作モデルを併用するのか |
 | [0010](0010-sleep-model-adoption-and-fallback.md) | 睡眠モデルの採用基準とフォールバック |
+| [0011](0011-i18n-and-finding-cards.md) | 多言語対応(日本語/英語)と、平易な所見カード |
