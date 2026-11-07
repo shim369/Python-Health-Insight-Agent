@@ -125,7 +125,9 @@ def test_fake_uses_the_latest_question_not_the_first_one_in_the_history() -> Non
 
 
 def test_disclaimers_exist_in_both_languages() -> None:
-    assert DISCLAIMERS[Locale.JA].startswith("※") and "medical" in DISCLAIMERS[Locale.EN]
+    # 両言語とも「※」で始める(UIが本文と分離して控えめに表示するための目印)
+    assert DISCLAIMERS[Locale.JA].startswith("※") and DISCLAIMERS[Locale.EN].startswith("※")
+    assert "medical" in DISCLAIMERS[Locale.EN]
 
 
 # ---------------- ツール結果の言語(ロケールの受け渡し) ----------------

@@ -13,7 +13,7 @@ from health_insight_agent.domain.enums import Locale
 DISCLAIMERS = {
     Locale.JA: "※ これは記録データに基づく参考情報です。医療診断・治療の助言ではありません。"
     "体調に不安がある場合は医療機関に相談してください。",
-    Locale.EN: "Note: This is informational, based on your logged data. It is not a medical "
+    Locale.EN: "※ This is informational, based on your logged data. It is not a medical "
     "diagnosis or treatment advice. If you are worried about your health, consult a professional.",
 }
 
