@@ -7,7 +7,7 @@ from uuid import UUID
 from health_insight_agent.agent.loop import AgentConfig, HealthInsightAgent
 from health_insight_agent.agent.prompts import DISCLAIMERS
 from health_insight_agent.agent.usage_log import QueryLog
-from health_insight_agent.ai.errors import AIServiceUnavailableError
+from health_insight_agent.ai.errors import AIRateLimitError, AIServiceUnavailableError
 from health_insight_agent.ai.fake_provider import (
     CallbackLLMProvider,
     ScriptedLLMProvider,
@@ -146,3 +146,18 @@ def test_query_log_does_not_contain_the_question_text() -> None:
     agent, logs = _agent(ScriptedLLMProvider([text_response("ok")]))
     agent.ask(USER, "私のひみつの質問")
     assert "ひみつ" not in repr(logs[0].to_json())
+
+
+def test_rate_limit_gets_a_specific_message_telling_the_user_to_wait() -> None:
+    """無料枠の1分あたり上限(429)は、待てば直る。「接続できません」ではなくそう伝える。"""
+
+    def limited(system: str, messages: Any, tools: Any):  # type: ignore[no-untyped-def]
+        raise AIRateLimitError("429 RESOURCE_EXHAUSTED")
+
+    agent, logs = _agent(CallbackLLMProvider(limited))
+    ja = agent.ask(USER, "q")
+    en = agent.ask(USER, "q", locale=Locale.EN)
+    assert ja.status == en.status == "llm_error"
+    assert "利用上限" in ja.text and "1分" in ja.text
+    assert "rate limit" in en.text and "minute" in en.text
+    assert "接続できず" not in ja.text  # 一般的なエラー文とは区別される

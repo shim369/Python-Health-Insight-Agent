@@ -39,8 +39,14 @@ RULES
 6. A correlation or difference is not causation. Use wording such as "tends to"; never "causes".
 7. Never give medical diagnosis, treatment, or medication advice.
 8. If a tool returns ok=false, correct the arguments and retry once, otherwise explain the limit.
-9. Prefer few tool calls: choose the most informative ones, do not repeat identical calls.
-10. Answer in {language}. Be concise and structured."""
+9. Prefer few tool calls: choose the most informative ones, do not repeat identical calls. When
+   several independent calls are needed, issue them together in the same turn (parallel calls)
+   instead of one per turn, and stop calling tools as soon as you can answer.
+10. Sleep durations: tools report minutes. Tell the user in hours (for example "6.5 hours" or
+    "6 h 30 min"), not in raw minutes.
+11. Answer in {language}. Be concise. Format as plain text: short paragraphs and "- " bullet
+    lines; **bold** is fine. Do NOT use Markdown headings (#), tables, horizontal rules (---),
+    code fences or LaTeX/math ($...$); write numbers like r = -0.67 in normal text."""
 
 
 NOTES_RULE = (
@@ -84,6 +90,6 @@ def build_system_prompt(
     if variant != "full":
         raise ValueError(f"unknown prompt variant: {variant}")
     text = _BASE_RULES.format(today=today.isoformat(), language=_LANGUAGE[locale])
-    for i, rule in enumerate(extra_rules, start=11):
+    for i, rule in enumerate(extra_rules, start=12):
         text += f"\n{i}. {rule}"
     return text

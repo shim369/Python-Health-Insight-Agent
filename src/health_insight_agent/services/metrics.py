@@ -189,13 +189,21 @@ METRIC_NAMES: tuple[str, ...] = tuple(METRICS)
 _DISPLAY: dict[str, tuple[float, str, str]] = {"sleep_duration_min": (60.0, "時間", "h")}
 
 
+_UNIT_EN = {"分": "min", "時": "h", "時間": "h"}
+"""日本語の単位 → 英語。英語表示に「時」「分」が残らないようにする。"""
+
+
+def unit_text(unit: str, locale: str) -> str:
+    return _UNIT_EN.get(unit, unit) if locale == "en" else unit
+
+
 def metric_display(name: str, locale: str = "ja") -> tuple[float, str]:
     """(表示用の割る数, 表示用の単位)。変換が無い指標は(1.0, 元の単位)。"""
     if name in _DISPLAY:
         divisor, ja, en = _DISPLAY[name]
         return divisor, en if locale == "en" else ja
     m = METRICS.get(name)
-    return 1.0, (m.unit if m else "")
+    return 1.0, unit_text(m.unit if m else "", locale)
 
 
 def display_value(name: str, value: float | None) -> float | None:

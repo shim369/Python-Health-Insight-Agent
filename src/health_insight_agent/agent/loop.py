@@ -21,7 +21,7 @@ from uuid import UUID
 
 from health_insight_agent.agent.prompts import DISCLAIMERS, build_system_prompt
 from health_insight_agent.agent.usage_log import QueryLog, QuerySink, logging_sink
-from health_insight_agent.ai.errors import AIProviderError
+from health_insight_agent.ai.errors import AIProviderError, AIRateLimitError
 from health_insight_agent.ai.protocols import LLMProvider, Message, TokenUsage, ToolResultPart
 from health_insight_agent.domain.enums import Locale
 from health_insight_agent.local_time import local_today
@@ -36,6 +36,12 @@ _LLM_ERROR_TEXT = {
     "しばらくしてからもう一度お試しください。",
     Locale.EN: "I could not reach the AI service, so I could not produce an answer. "
     "Please try again in a moment.",
+}
+_RATE_LIMIT_TEXT = {
+    Locale.JA: "AIサービスの利用上限(リクエスト数の制限)に達しました。無料枠では1分あたりの回数が"
+    "少ないため、1分ほど待ってからもう一度お試しください。",
+    Locale.EN: "The AI service rate limit was reached (free tiers allow only a few requests per "
+    "minute). Please wait about a minute and try again.",
 }
 _EMPTY_TEXT = {
     Locale.JA: "回答を生成できませんでした。質問を言い換えてもう一度お試しください。",
@@ -127,10 +133,15 @@ class HealthInsightAgent:
             offered = [] if budget_exhausted else specs
             try:
                 resp = self._llm.generate(system=system, messages=messages, tools=offered)
-            except AIProviderError:
+            except AIProviderError as e:
                 logger.exception("LLM call failed")
                 status = "llm_error"
-                text = _LLM_ERROR_TEXT[locale]
+                # 429(利用上限)は、待てば直るので、そう伝える。それ以外は一般的なエラー文。
+                text = (
+                    _RATE_LIMIT_TEXT[locale]
+                    if isinstance(e, AIRateLimitError)
+                    else _LLM_ERROR_TEXT[locale]
+                )
                 break
             llm_calls += 1
             usage = usage + resp.usage

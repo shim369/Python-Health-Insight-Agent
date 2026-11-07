@@ -261,3 +261,18 @@ def test_model_adoption_reasons_exist_in_english() -> None:
     _, q40 = F.build_samples(_series(40))
     assert "データ量が不足" in q40.reason and "Not enough data" in q40.reason_en
     assert not JAPANESE.search(q40.reason_en)
+
+
+def test_english_units_contain_no_japanese() -> None:
+    from health_insight_agent.services.metrics import (
+        METRICS,
+        mean_display,
+        metric_display,
+        unit_text,
+    )
+
+    for name in METRICS:
+        assert not JAPANESE.search(metric_display(name, "en")[1]), name
+        assert not JAPANESE.search(mean_display(name, 1.0, "en")[1]), name
+    assert unit_text("時", "en") == "h" and unit_text("分", "en") == "min"
+    assert unit_text("時", "ja") == "時" and unit_text("kcal", "en") == "kcal"
