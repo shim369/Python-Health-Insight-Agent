@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Locale } from "./api/types";
 import { ChatView } from "./components/ChatView";
 import { t } from "./lib/strings";
@@ -6,6 +6,10 @@ import { t } from "./lib/strings";
 export function App() {
   const [locale, setLocale] = useState<Locale>("ja");
   const s = t(locale);
+  // 読み上げ・ハイフネーション・フォント選択のため、文書の言語も切り替える
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
   return (
     <div className="app">
       <header className="app-header">
