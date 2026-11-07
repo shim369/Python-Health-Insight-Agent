@@ -81,6 +81,7 @@ def create_app(
             except Exception:
                 logger.warning("database not reachable at startup", exc_info=True)
         yield
+        the_agent.close()  # MCP経由のときは子プロセス・接続を閉じる
 
     app = FastAPI(title="Health Insight Agent", lifespan=lifespan)
     app.add_middleware(

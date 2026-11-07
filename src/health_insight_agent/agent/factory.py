@@ -18,6 +18,7 @@ from health_insight_agent.services.health_insight_service import LocalHealthInsi
 from health_insight_agent.services.insight_data_service import InsightDataService
 from health_insight_agent.tools.base import ToolRegistry
 from health_insight_agent.tools.builtin import build_default_registry
+from health_insight_agent.tools.executor import ToolExecutor
 
 
 def build_registry(settings: Settings, *, today: date | None = None) -> ToolRegistry:
@@ -45,6 +46,19 @@ def build_registry(settings: Settings, *, today: date | None = None) -> ToolRegi
     )
 
 
+def build_tool_executor(settings: Settings, *, today: date | None = None) -> ToolExecutor:
+    """TOOL_TRANSPORT=direct|mcp でツールの呼び方を切り替える(エージェント側のコードは同じ)。"""
+    if settings.tool_transport == "mcp":
+        from health_insight_agent.mcp_server.client import McpToolExecutor, stdio_params
+
+        extra = {"MCP_TODAY": today.isoformat()} if today else {}
+        return McpToolExecutor(
+            stdio_params(extra_env={**extra, "MCP_USER_ID": str(settings.demo_user_id)}),
+            settings.demo_user_id,
+        )
+    return build_registry(settings, today=today)
+
+
 def build_agent(
     settings: Settings,
     *,
@@ -55,7 +69,7 @@ def build_agent(
 ) -> HealthInsightAgent:
     return HealthInsightAgent(
         llm or build_llm_provider(settings.ai_provider, model=settings.gemini_model),
-        build_registry(settings, today=today),
+        build_tool_executor(settings, today=today),
         config=config or AgentConfig(extra_rules=(NOTES_RULE,)),
         today=(lambda: today) if today else local_today,
         sink=sink or JsonlSink(PROJECT_ROOT / "logs" / "agent_queries.jsonl"),

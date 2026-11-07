@@ -28,6 +28,7 @@ SETTINGS = Settings(
     app_env="test",
     ai_provider="fake",
     gemini_model=None,
+    tool_transport="direct",
     log_level="INFO",
 )
 

@@ -34,6 +34,8 @@ class Settings:
     app_env: str
     ai_provider: str
     gemini_model: str | None
+    tool_transport: str
+    """direct=関数を直接呼ぶ / mcp=MCPサーバー(子プロセス)経由で呼ぶ。"""
     log_level: str
 
 
@@ -50,6 +52,7 @@ def load_settings() -> Settings:
         app_env=os.environ.get("APP_ENV", "dev"),
         ai_provider=os.environ.get("AI_PROVIDER", "gemini").lower(),
         gemini_model=os.environ.get("GEMINI_MODEL") or None,
+        tool_transport=os.environ.get("TOOL_TRANSPORT", "direct").lower(),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
     )
 
