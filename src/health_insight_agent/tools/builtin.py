@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -136,8 +136,9 @@ def build_default_registry(
         tables = {
             name: {
                 "count": b.count,
-                "first": b.first.isoformat() if b.first else None,
-                "last": b.last.isoformat() if b.last else None,
+                # UTCのまま返すとLLMが日付を1日取り違えるため、JSTにして返す。
+                "first": iso_jst(b.first) if isinstance(b.first, datetime) else None,
+                "last": iso_jst(b.last) if isinstance(b.last, datetime) else None,
             }
             for name, b in o.tables.items()
         }
