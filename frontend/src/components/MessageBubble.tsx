@@ -1,6 +1,7 @@
 import type { ChatResponse, Locale } from "../api/types";
 import { t } from "../lib/strings";
 import { ChartView } from "./Charts";
+import { FindingCard } from "./FindingCard";
 import { IconHelp, IconInfo, IconSpark, IconUser } from "./Icons";
 import { ToolTrace } from "./ToolTrace";
 
@@ -106,6 +107,13 @@ export function MessageBubble({
           <div className="charts">
             {r.charts.map((c, i) => (
               <ChartView key={i} chart={c} locale={locale} />
+            ))}
+          </div>
+        ) : null}
+        {r && r.findings.length > 0 ? (
+          <div className="findings">
+            {r.findings.map((f, i) => (
+              <FindingCard key={i} finding={f} locale={locale} />
             ))}
           </div>
         ) : null}

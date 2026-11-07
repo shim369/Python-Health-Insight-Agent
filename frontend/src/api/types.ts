@@ -45,6 +45,37 @@ export interface Chart {
   note?: string | null;
 }
 
+export type Tone = "negative" | "positive" | "none" | "unknown";
+
+export interface FindingRow {
+  label: string;
+  mean_a: number | null;
+  mean_b: number | null;
+  n_a: number;
+  n_b: number;
+  unit: string;
+  verdict_text: string;
+  tone: Tone;
+}
+
+/** 統計ツールの結果を人が読める形にした所見(バックエンド services/findings.py)。 */
+export interface Finding {
+  kind: "correlation" | "comparison";
+  title: string;
+  // correlation
+  verdict_text?: string | null;
+  tone?: Tone | null;
+  strength?: number | null;
+  r?: number | null;
+  n?: number | null;
+  reliability?: string | null;
+  reliability_text?: string | null;
+  // comparison
+  n_a?: number | null;
+  n_b?: number | null;
+  rows?: FindingRow[];
+}
+
 export interface UsageInfo {
   input_tokens: number;
   output_tokens: number;
@@ -62,6 +93,7 @@ export interface ChatResponse {
   status: AnswerStatus;
   tool_trace: ToolTraceItem[];
   charts: Chart[];
+  findings: Finding[];
   usage: UsageInfo;
 }
 

@@ -46,6 +46,7 @@ const response: ChatResponse = {
       label: "モデルによる参考値",
     },
   ],
+  findings: [],
   usage: {
     input_tokens: 100,
     output_tokens: 50,
