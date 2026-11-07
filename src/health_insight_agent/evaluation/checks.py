@@ -58,7 +58,9 @@ def tool_numbers(trace: Iterable[ToolExecution]) -> list[float]:
     for t in trace:
         if t.ok:
             _flatten_numbers(t.content, nums)
+    # 分⇔時間、割合⇔パーセントの換算値も、根拠のある数値として許容する。
     derived = [n / 60 for n in nums] + [n * 60 for n in nums] + [abs(n) for n in nums]
+    derived += [n * 100 for n in nums]
     return nums + derived
 
 

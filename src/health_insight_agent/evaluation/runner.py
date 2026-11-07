@@ -7,9 +7,10 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from uuid import UUID
 
@@ -40,6 +41,8 @@ class QuestionResult:
     fabricated: bool
     """nullの質問で、ツールは「関係なし」と示したのに回答が「ない」と言っていない。"""
     answer: str
+    consistent: bool | None = None
+    """同じ質問を繰り返したとき、主要な数値が毎回同じか(モデル質問のみ。数値が無ければNone)。"""
 
 
 def _resolve(patterns: Sequence[Pattern], ctx: EvalContext) -> list[str]:
@@ -99,16 +102,43 @@ def evaluate_question(q: EvalQuestion, answer: AgentAnswer, ctx: EvalContext) ->
     )
 
 
+def numeric_signature(answer: AgentAnswer) -> float | None:
+    """回答の「主要な数値」: 予測ツールの値があればそれ、無ければ回答中の最初の統計らしい数値。"""
+    for t in answer.tool_trace:
+        if t.ok and t.name == "predict_sleep_duration":
+            value = t.content["data"].get("predicted_sleep_minutes")
+            if value is not None:
+                return float(value)
+    body = answer.text.split("※")[0]
+    for m in re.finditer(r"-?\d+(?:\.\d+)?", body):
+        if "." in m.group(0) or abs(float(m.group(0))) >= 10:
+            return float(m.group(0))
+    return None
+
+
 def run_questions(
     agent: HealthInsightAgent,
     questions: Sequence[EvalQuestion],
     ctx: EvalContext,
     *,
     user_id: UUID = EVAL_USER_ID,
+    repeat: int = 3,
 ) -> list[QuestionResult]:
+    """各質問を実行して採点する。モデル質問だけは`repeat`回繰り返し、数値の一貫性も測る。"""
     out: list[QuestionResult] = []
     for q in questions:
-        out.append(evaluate_question(q, agent.ask(user_id, q.question), ctx))
+        first = agent.ask(user_id, q.question)
+        result = evaluate_question(q, first, ctx)
+        if q.kind == "model" and repeat > 1:
+            sigs = [numeric_signature(first)] + [
+                numeric_signature(agent.ask(user_id, q.question)) for _ in range(repeat - 1)
+            ]
+            known = [v for v in sigs if v is not None]
+            consistent = (
+                None if len(known) < len(sigs) else all(abs(v - known[0]) <= 0.5 for v in known)
+            )
+            result = replace(result, consistent=consistent)
+        out.append(result)
     return out
 
 
@@ -128,6 +158,8 @@ class Summary:
     null_fabricated: int
     null_missed: int
     """nullの質問のうち、そもそも証拠(ツール結果)を取れなかった数。"""
+    model_consistency: tuple[int, int] = (0, 0)
+    """モデル質問のうち、一貫性を判定できた数と、毎回同じ数値だった数。"""
     extra: dict[str, float] = field(default_factory=dict)
 
     @property
@@ -157,6 +189,10 @@ def summarize(config: str, results: Sequence[QuestionResult]) -> Summary:
         null_total=len(nulls),
         null_fabricated=sum(r.fabricated for r in nulls),
         null_missed=sum(not r.checks.get("evidence", False) for r in nulls),
+        model_consistency=(
+            sum(r.consistent is not None for r in results),
+            sum(r.consistent is True for r in results),
+        ),
     )
 
 
@@ -180,6 +216,7 @@ def render_markdown(
     kinds = [k for k in _KIND_ORDER if any(k in s.by_kind for s in summaries)]
     head = ["設定", "正答率", *[_KIND_LABEL[k] for k in kinds]]
     head += ["ツール呼出/問", "トークン/問", "秒/問", "数値の根拠率", "でっち上げ(null)"]
+    head += ["数値の一貫性(model)"]
     lines.append("| " + " | ".join(head) + " |")
     lines.append("|" + "|".join("---" for _ in head) + "|")
     for s in summaries:
@@ -192,6 +229,8 @@ def render_markdown(
         cells.append(f"{s.avg_duration_ms / 1000:.2f}")
         cells.append("-" if s.grounded_avg is None else f"{s.grounded_avg:.0%}")
         cells.append(f"{s.null_fabricated}/{s.null_total}")
+        n_def, n_ok = s.model_consistency
+        cells.append(f"{n_ok}/{n_def}" if n_def else "-")
         lines.append("| " + " | ".join(cells) + " |")
     lines += ["", "## 質問ごとの結果(✓=正答 / ✗=誤答)", ""]
     configs = list(results_by_config)

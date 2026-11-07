@@ -47,7 +47,7 @@ def _answer(text: str, trace: list[ToolExecution] | None = None) -> AgentAnswer:
 
 
 def test_question_set_is_well_formed() -> None:
-    assert len(QUESTIONS) == 22
+    assert len(QUESTIONS) == 22  # 通常の質問(自作モデルの質問は別枠)
     ids = [q.qid for q in QUESTIONS]
     assert len(ids) == len(set(ids))
     kinds = {q.kind for q in QUESTIONS}
@@ -55,6 +55,9 @@ def test_question_set_is_well_formed() -> None:
     assert sum(q.kind == "null" for q in QUESTIONS) >= 5  # でっち上げ検出の問いが十分ある
     assert all(q.must_match or q.evidence or q.any_tools for q in QUESTIONS)
     assert len(get_questions()) == 22
+    with_model = get_questions(include_model=True)
+    assert len(with_model) == 25 and {q.qid for q in with_model} >= {"Q1", "Q2", "Q3"}
+    assert all(q.requires_model for q in with_model if q.kind == "model")
 
 
 def test_relation_sign_reads_the_tools_interpretation_in_either_direction() -> None:

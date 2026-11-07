@@ -25,6 +25,7 @@ class EvalConfig:
     prompt_variant: str = "full"
     enable_notes: bool = True
     enable_sql: bool = True
+    enable_model: bool = True
     max_tool_calls: int = 8
 
 
@@ -33,11 +34,18 @@ PRESETS: dict[str, EvalConfig] = {
     for c in (
         EvalConfig("fake-all", "ルールベース(LLM抜き)・全ツール", "fake"),
         EvalConfig(
+            "fake-no-model",
+            "ルールベース・自作モデルなし(通常ツールのみ。RAG/SQLはあり)",
+            "fake",
+            enable_model=False,
+        ),
+        EvalConfig(
             "fake-typed-only",
-            "ルールベース・型付きツールのみ(RAG/SQLなし)",
+            "ルールベース・型付きツールのみ(RAG/SQL/モデルなし)",
             "fake",
             enable_notes=False,
             enable_sql=False,
+            enable_model=False,
         ),
         EvalConfig("gemini-flash-all", "Gemini(既定モデル)・全ツール・fullプロンプト", "gemini"),
         EvalConfig(
@@ -47,11 +55,18 @@ PRESETS: dict[str, EvalConfig] = {
             prompt_variant="minimal",
         ),
         EvalConfig(
+            "gemini-flash-no-model",
+            "Gemini・自作モデルなし(通常ツールのみ)",
+            "gemini",
+            enable_model=False,
+        ),
+        EvalConfig(
             "gemini-flash-typed-only",
             "Gemini・型付きツールのみ",
             "gemini",
             enable_notes=False,
             enable_sql=False,
+            enable_model=False,
         ),
         EvalConfig(
             "gemini-flash-lite-all",
@@ -68,7 +83,12 @@ def build_eval_agent(
 ) -> HealthInsightAgent:
     s = replace(settings, ai_provider=cfg.provider, gemini_model=cfg.model)
     registry = build_registry(
-        s, today=today, enable_notes=cfg.enable_notes, enable_sql=cfg.enable_sql, **registry_flags
+        s,
+        today=today,
+        enable_notes=cfg.enable_notes,
+        enable_sql=cfg.enable_sql,
+        enable_model=cfg.enable_model,
+        **registry_flags,
     )
     rules = tuple(
         r for r, enabled in ((NOTES_RULE, cfg.enable_notes), (SQL_RULE, cfg.enable_sql)) if enabled

@@ -99,6 +99,21 @@ def _note_query(question: str) -> str:
     return cleaned or question
 
 
+_HOUR_RE = re.compile(r"(\d{1,2})時(半)?")
+
+
+def _predict_args(question: str) -> dict[str, float]:
+    """「22時半に夕食を終えて0時に寝たら」→ 最後の食事22.5時・就寝24時。"""
+    hours = [int(h) + (0.5 if half else 0.0) for h, half in _HOUR_RE.findall(question)]
+    meal = hours[0] if hours else 22.5
+    bed = hours[1] if len(hours) > 1 else max(24.0, meal + 1.5)
+    if bed < 12:  # 「0時」「1時」は日付をまたいだ深夜
+        bed += 24
+    if bed <= meal:
+        bed += 24
+    return {"last_meal_hour": meal, "bedtime_hour": bed}
+
+
 def _plan(question: str, today: date) -> list[ToolCall]:
     q = question.lower()
     period = _period(question, today)
@@ -120,6 +135,13 @@ def _plan(question: str, today: date) -> list[ToolCall]:
                 {**_period("", today), "limit": 200},
             )
         ]
+    asks_forecast = (
+        _has(q, "なりそう", "予測", "寝たら") and _has(q, "明日", "今夜") and _has(q, "食")
+    )
+    if asks_forecast:
+        return [ToolCall("c1", "predict_sleep_duration", _predict_args(question))]
+    if _has(q, "要因") and _has(q, "最も", "一番", "影響している") and _has(q, "睡眠"):
+        return [ToolCall("c1", "explain_sleep_factors", {})]
     mentioned = _mentioned_metrics(question)
     asks_relation = _has(
         q, "相関", "関係", "影響", "correlat", "どうなる", "遅め", "夜", "違", "差"
@@ -187,6 +209,31 @@ def _summarize(results: list[tuple[str, dict[str, Any]]]) -> str:
         elif name == "get_recommendations":
             for r in d["recommendations"][:3]:
                 lines.append(f"- 提案({r['domain']}): {r['message']}")
+        elif name == "predict_sleep_duration":
+            m = d["model"]
+            if d["model_used"]:
+                hours, minutes = d["predicted_sleep_hours"], d["predicted_sleep_minutes"]
+                gain = round(m["improvement_vs_baseline"] * 100, 1)
+                lines.append(
+                    f"- 明日の睡眠時間の予測(モデルによる参考値): 約{hours}時間({minutes}分)。"
+                    f"モデルの誤差(MAE)は約{m['mae_minutes']}分で、"
+                    f"ベースライン(直近平均など)より{gain}%良い結果でした(Baseline比)。"
+                    "参考値であり確定ではありません。"
+                )
+            else:
+                fb = d.get("fallback") or {}
+                lines.append(f"- モデルは使っていません({m['reason']})。")
+                if fb.get("recent_mean_minutes") is not None:
+                    lines.append(f"  参考: 直近の平均睡眠は約{fb['recent_mean_minutes']}分です。")
+        elif name == "explain_sleep_factors":
+            if d["model_used"]:
+                top = ", ".join(f"{f['label']}(重要度{f['importance']})" for f in d["factors"][:3])
+                lines.append(
+                    f"- モデルが睡眠時間の予測に使った主な要因: {top}。"
+                    "重要度は予測への寄与で、因果の強さではありません(参考値)。"
+                )
+            else:
+                lines.append(f"- モデルは使っていません({d['model']['reason']})。")
         elif name == "get_workout_logs":
             rows = d["rows"]
             high = sum(1 for r in rows if r["intensity"] == "high")

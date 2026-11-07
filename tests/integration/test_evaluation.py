@@ -40,7 +40,7 @@ def ctx(migrated_database: str) -> Iterator[EvalContext]:
 
 def _run(name: str, ctx: EvalContext) -> list[QuestionResult]:
     agent = build_eval_agent(load_settings(), PRESETS[name], today=ctx.today)
-    return run_questions(agent, get_questions(), ctx)
+    return run_questions(agent, get_questions(include_model=True), ctx)
 
 
 def test_rule_based_baseline_finds_patterns_and_never_fabricates(ctx: EvalContext) -> None:
@@ -70,4 +70,27 @@ def test_markdown_report_lists_every_config_and_question(ctx: EvalContext) -> No
     results = {n: _run(n, ctx) for n in ("fake-all", "fake-typed-only")}
     md = render_markdown([summarize(n, r) for n, r in results.items()], results)
     assert "`fake-all`" in md and "`fake-typed-only`" in md
-    assert all(f"| {q.qid} |" in md for q in get_questions())
+    assert all(f"| {q.qid} |" in md for q in get_questions(include_model=True))
+
+
+def test_custom_model_questions_pass_only_when_the_model_tool_is_available(
+    ctx: EvalContext,
+) -> None:
+    with_model = {r.qid: r for r in _run("fake-all", ctx)}
+    without = {r.qid: r for r in _run("fake-no-model", ctx)}
+    for qid in ("Q1", "Q2", "Q3"):
+        assert with_model[qid].passed, (qid, with_model[qid].failures)
+        assert not without[qid].passed
+    # 予測値は「参考値」+ モデルのMAE + Baseline比つきで述べられている
+    q1 = with_model["Q1"].answer
+    assert "参考値" in q1 and "MAE" in q1 and "ベースライン" in q1
+
+
+def test_numeric_consistency_with_and_without_the_model(ctx: EvalContext) -> None:
+    s_with = summarize("fake-all", _run("fake-all", ctx))
+    s_without = summarize("fake-no-model", _run("fake-no-model", ctx))
+    # モデルあり: 同じ質問を3回繰り返しても予測値が毎回同じ(数値の一貫性)
+    assert s_with.model_consistency == (3, 3)
+    # モデルなし: 予測値そのものが存在しないので、一貫性は判定対象外
+    assert s_without.model_consistency == (0, 0)
+    assert s_with.passed > s_without.passed

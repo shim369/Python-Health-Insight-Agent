@@ -98,8 +98,14 @@ def test_stdio_subprocess_server_returns_the_same_result(
         connect_timeout_seconds=60,
     )
     try:
-        # 子プロセスは本番構成(RAG・SQLあり)なので、テスト用レジストリの全ツール+両方
-        assert set(ex.names) == {*registry.names, "search_notes", "run_readonly_sql"}
+        # 子プロセスは本番構成(RAG・SQL・自作モデルあり)なので、テスト用レジストリの全ツール+それら
+        extra = {
+            "search_notes",
+            "run_readonly_sql",
+            "predict_sleep_duration",
+            "explain_sleep_factors",
+        }
+        assert set(ex.names) == {*registry.names, *extra}
         via = ex.execute(uid, "compare_days", ARGS)
         direct = registry.execute(uid, "compare_days", ARGS)
         assert via.ok and via.content == direct.content and via.charts == direct.charts

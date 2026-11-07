@@ -53,6 +53,7 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=PROJECT_ROOT / "evaluation" / "results")
     parser.add_argument("--write-docs", type=Path, default=None, help="表をMarkdownで書き出す先")
     parser.add_argument("--include-model", action="store_true", help="自作モデルの質問も含める")
+    parser.add_argument("--repeat", type=int, default=3, help="モデル質問の繰り返し回数(一貫性)")
     parser.add_argument(
         "--min-rate",
         action="append",
@@ -88,7 +89,7 @@ def main() -> None:
             continue
         print(f"[run] {name}: {len(questions)} questions")
         agent = build_eval_agent(settings, cfg, today=ctx.today)
-        results = run_questions(agent, questions, ctx)
+        results = run_questions(agent, questions, ctx, repeat=args.repeat)
         by_config[name] = results
         summaries.append(summarize(name, results))
         s = summaries[-1]

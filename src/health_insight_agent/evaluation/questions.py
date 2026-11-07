@@ -296,5 +296,64 @@ QUESTIONS: tuple[EvalQuestion, ...] = (
 )
 
 
+def _predicted_between(low: float, high: float) -> Evidence:
+    def ev(trace: Sequence[ToolExecution], ctx: EvalContext) -> bool:
+        for t in trace:
+            if t.ok and t.name == "predict_sleep_duration":
+                d = t.content["data"]
+                if d["model_used"] and low <= d["predicted_sleep_minutes"] <= high:
+                    return True
+        return False
+
+    return ev
+
+
+def _top_factor_is_meal_timing(trace: Sequence[ToolExecution], ctx: EvalContext) -> bool:
+    from health_insight_agent.ml.features import MEAL_TIMING_FEATURES
+
+    for t in trace:
+        if t.ok and t.name == "explain_sleep_factors":
+            d = t.content["data"]
+            return bool(d["model_used"] and d["factors"][0]["feature"] in MEAL_TIMING_FEATURES)
+    return False
+
+
+MODEL_ANSWER: tuple[Pattern, ...] = (
+    r"参考値|reference",  # 予測値は参考値であること
+    r"MAE|誤差|±",  # モデルの誤差
+    r"ベースライン|baseline|直近平均|Baseline",  # Baseline比
+)
+
+MODEL_QUESTIONS: tuple[EvalQuestion, ...] = (
+    EvalQuestion(
+        "Q1",
+        "model",
+        "今夜、22時半に夕食を終えて0時に寝たら、明日の睡眠時間はどれくらいになりそう?",
+        ("predict_sleep_duration",),
+        _predicted_between(320, 410),  # 就寝1.5時間前の食事=遅い食事。仕込みでは約360分
+        MODEL_ANSWER,
+        requires_model=True,
+    ),
+    EvalQuestion(
+        "Q2",
+        "model",
+        "19時に夕食を終えて23時に寝たら、明日の睡眠時間は?",
+        ("predict_sleep_duration",),
+        _predicted_between(390, 470),  # 就寝4時間前=余裕あり。仕込みでは約420分
+        MODEL_ANSWER,
+        requires_model=True,
+    ),
+    EvalQuestion(
+        "Q3",
+        "model",
+        "睡眠時間に最も影響している要因は何?",
+        ("explain_sleep_factors",),
+        _top_factor_is_meal_timing,
+        (r"参考|因果|ではありません|not causal", r"食事|就寝|meal|gap"),
+        requires_model=True,
+    ),
+)
+
+
 def get_questions(*, include_model: bool = False) -> list[EvalQuestion]:
-    return [q for q in QUESTIONS if include_model or not q.requires_model]
+    return [q for q in (*QUESTIONS, *MODEL_QUESTIONS) if include_model or not q.requires_model]
