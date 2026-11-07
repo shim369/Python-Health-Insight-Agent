@@ -20,6 +20,10 @@ from health_insight_agent.ai.protocols import (
     ToolCall,
     ToolSpec,
 )
+from health_insight_agent.services.findings import (
+    comparison_finding,
+    correlation_finding,
+)
 
 _TODAY_RE = re.compile(r"today[^0-9]*(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
 
@@ -255,35 +259,30 @@ def _summarize(results: list[tuple[str, dict[str, Any]]], *, en: bool = False) -
         d, ev = content["data"], content["evidence"]
         n = ev.get("rows_used")
         if name == "compare_days":
-            period, n_days = ev.get("period"), d["n_days_with_condition_data"]
-            n_a, n_b = d["n_group_a"], d["n_group_b"]
+            cf = comparison_finding(d, "en" if en else "ja")
             lines.append(
                 tr(
-                    f"- {period} の{n_days}日を、条件に当てはまる{n_a}日(A)と"
-                    f"それ以外{n_b}日(B)に分けて比較しました。",
-                    f"- Compared {n_days} days in {period}: {n_a} matching days (A) "
-                    f"vs {n_b} other days (B).",
+                    f"- {cf.title}を比較しました(グループA: {cf.n_a}日、グループB: {cf.n_b}日)。",
+                    f"- Compared {cf.title} (group A: {cf.n_a} days, group B: {cf.n_b} days).",
                 )
             )
-            for metric, c in d["metrics"].items():
-                mean_a, mean_b = c["group_a"]["mean"], c["group_b"]["mean"]
-                verdict, rel, p = c["interpretation"], c["reliability"], c["p_value"]
+            for row in cf.rows:
                 lines.append(
                     tr(
-                        f"  - {metric}: A平均={mean_a}, B平均={mean_b}, "
-                        f"判定={verdict}(信頼度={rel}, p={p})",
-                        f"  - {metric}: A mean={mean_a}, B mean={mean_b}, "
-                        f"result={verdict} (reliability={rel}, p={p})",
+                        f"  - {row.label}: A={row.mean_a}{row.unit} / B={row.mean_b}{row.unit}"
+                        f" → {row.verdict_text}",
+                        f"  - {row.label}: A={row.mean_a} {row.unit} / B={row.mean_b} {row.unit}"
+                        f" → {row.verdict_text}",
                     )
                 )
         elif name == "correlate":
+            f = correlation_finding(d, "en" if en else "ja")
+            r = "-" if f.r is None else f"{f.r:.2f}"
             lines.append(
                 tr(
-                    f"- {d['x_metric']} と {d['y_metric']}: {d['n_pairs']}件, r={d['pearson_r']}, "
-                    f"判定={d['interpretation']}(信頼度={d['reliability']})。"
+                    f"- {f.verdict_text}(r={r}、{f.n}件、{f.reliability_text})。"
                     "相関は因果を意味しません。",
-                    f"- {d['x_metric']} vs {d['y_metric']}: n={d['n_pairs']}, r={d['pearson_r']}, "
-                    f"result={d['interpretation']} (reliability={d['reliability']}). "
+                    f"- {f.verdict_text} (r={r}, n={f.n}; {f.reliability_text}). "
                     "Correlation does not imply causation.",
                 )
             )

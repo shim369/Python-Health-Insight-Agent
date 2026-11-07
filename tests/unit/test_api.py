@@ -156,3 +156,34 @@ def test_chart_texts_are_returned_in_the_requested_language() -> None:
         ja[1]["label"] == "モデルによる参考値" and en[1]["label"] == "Model-based reference value"
     )
     assert en[1]["unit"] == "h" and "ja" not in str(en)  # 言語キーの辞書は残らない
+
+
+def test_statistics_tools_produce_findings_below_the_charts_in_the_users_language() -> None:
+    corr = {
+        "x_metric": "prev_day_late_meal",
+        "y_metric": "sleep_duration_min",
+        "n_pairs": 85,
+        "pearson_r": -0.75,
+        "interpretation": "strong_negative",
+        "reliability": "ok",
+    }
+
+    def handler(user_id: UUID, a: _Args) -> ToolOutput:
+        return ToolOutput(data=corr, rows_used=85)
+
+    def client() -> TestClient:
+        script = [tool_call_response(ToolCall("c1", "correlate", {})), text_response("x")] * 2
+        agent = HealthInsightAgent(
+            ScriptedLLMProvider(script),
+            ToolRegistry([Tool("correlate", "d", _Args, handler)]),
+            sink=lambda _l: None,
+        )
+        return TestClient(create_app(settings=SETTINGS, agent=agent, check_db_on_startup=False))
+
+    c = client()
+    ja = c.post("/api/chat", json={"question": "q", "locale": "ja"}).json()["findings"]
+    en = c.post("/api/chat", json={"question": "q", "locale": "en"}).json()["findings"]
+    assert ja[0]["kind"] == "correlation" and ja[0]["tone"] == "negative"
+    assert ja[0]["verdict_text"].startswith("強い負の相関") and ja[0]["n"] == 85
+    assert en[0]["verdict_text"].startswith("Strong negative correlation")
+    assert ja[0]["strength"] == 0.75 and ja[0]["reliability_text"] == "信頼度: 高"

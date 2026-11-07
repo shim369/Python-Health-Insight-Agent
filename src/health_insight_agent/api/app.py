@@ -25,9 +25,48 @@ from health_insight_agent.config import Settings, load_settings
 from health_insight_agent.database.connection import create_db_engine, wait_for_database
 from health_insight_agent.domain.enums import Locale
 from health_insight_agent.logging_config import get_logger
+from health_insight_agent.services.findings import (
+    ComparisonFinding,
+    CorrelationFinding,
+    build_findings,
+)
 from health_insight_agent.tools import charts as chart_texts
 
 logger = get_logger(__name__)
+
+
+def _finding(f: CorrelationFinding | ComparisonFinding) -> schemas.Finding:
+    if isinstance(f, CorrelationFinding):
+        return schemas.Finding(
+            kind="correlation",
+            title=f.title,
+            verdict_text=f.verdict_text,
+            tone=f.tone,  # type: ignore[arg-type]
+            strength=f.strength,
+            r=f.r,
+            n=f.n,
+            reliability=f.reliability,
+            reliability_text=f.reliability_text,
+        )
+    return schemas.Finding(
+        kind="comparison",
+        title=f.title,
+        n_a=f.n_a,
+        n_b=f.n_b,
+        rows=[
+            schemas.FindingRow(
+                label=r.label,
+                mean_a=r.mean_a,
+                mean_b=r.mean_b,
+                n_a=r.n_a,
+                n_b=r.n_b,
+                unit=r.unit,
+                verdict_text=r.verdict_text,
+                tone=r.tone,  # type: ignore[arg-type]
+            )
+            for r in f.rows
+        ],
+    )
 
 
 def _to_response(answer: AgentAnswer, locale: str) -> schemas.ChatResponse:
@@ -51,6 +90,7 @@ def _to_response(answer: AgentAnswer, locale: str) -> schemas.ChatResponse:
             for t in answer.tool_trace
             for c in t.charts
         ],
+        findings=[_finding(f) for f in build_findings(answer.tool_trace, locale)],
         usage=schemas.UsageInfo(
             input_tokens=answer.usage.input_tokens,
             output_tokens=answer.usage.output_tokens,

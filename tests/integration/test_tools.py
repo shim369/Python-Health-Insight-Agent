@@ -181,3 +181,20 @@ def test_tools_attach_charts_without_adding_them_to_llm_content(seeded: Any) -> 
     assert reg.execute(uid, "get_meal_logs", args).charts[0]["kind"] == "bar"
     assert reg.execute(uid, "get_workout_logs", args).charts[0]["kind"] == "bar"
     assert len(reg.execute(uid, "get_health_score", {}).charts[0]["series"][0]["points"]) == 5
+
+
+def test_tool_results_are_in_english_when_asked(seeded: Any) -> None:
+    """英語UIでは、ツール結果の文章(所見・提案)にも日本語が混ざらない。"""
+    import re
+
+    factory, uid, _ = seeded
+    reg = build_default_registry(
+        InsightDataService(factory, clock=lambda: FIXED_END_DATE),
+        LocalHealthInsightService(factory),
+    )
+    jp = re.compile(r"[぀-ヿ一-鿿]")
+    en = reg.execute(uid, "get_recommendations", {}, "en")
+    ja = reg.execute(uid, "get_recommendations", {}, "ja")
+    assert not jp.search(str(en.content)) and jp.search(str(ja.content))
+    score_en = reg.execute(uid, "get_health_score", {}, "en")
+    assert not jp.search(str(score_en.content))

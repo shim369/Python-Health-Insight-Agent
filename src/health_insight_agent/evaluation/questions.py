@@ -154,7 +154,12 @@ QUESTIONS: tuple[EvalQuestion, ...] = (
         "夕食が遅い日と早い日で、睡眠時間はどのくらい違う?",
         ("compare_days", "correlate", "run_readonly_sql"),
         _late_meal_effect,
-        (r"\d+(\.\d+)?\s*(分|時間|min|hour)",),
+        (
+            # 指標名の数字(「就寝3時間以内」等)を拾わないよう、差を示す語と結びつく数値だけ認める
+            r"(約|差|違い|短|長|少な|多|about|differ|shorter|longer)[^。\n]{0,12}"
+            r"\d+(\.\d+)?\s*(分|時間|min|h\b|hours?)"
+            r"|\d+(\.\d+)?\s*(分|時間|min|h\b|hours?)(ほど|程度|くらい)?[^。\n]{0,4}(短|長|差|違|少な|多)",
+        ),
     ),
     # ---------------- null: 仕込んでいない関係には「ない」と答える ----------------
     EvalQuestion(

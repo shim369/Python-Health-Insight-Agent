@@ -87,8 +87,8 @@ def test_fake_answers_in_the_language_of_the_system_prompt() -> None:
     en = llm.generate(
         system=build_system_prompt(today=TODAY, locale=Locale.EN), messages=msgs, tools=[]
     )
-    assert "判定=moderate_negative" in ja.message.text and "因果を意味しません" in ja.message.text
-    assert "result=moderate_negative" in en.message.text
+    assert "中程度の負の相関" in ja.message.text and "因果を意味しません" in ja.message.text
+    assert "Moderate negative correlation" in en.message.text
     assert "does not imply causation" in en.message.text
     assert not any(ord(ch) > 0x2FFF for ch in en.message.text)  # 英語の回答に日本語が混ざらない
 
@@ -126,3 +126,138 @@ def test_fake_uses_the_latest_question_not_the_first_one_in_the_history() -> Non
 
 def test_disclaimers_exist_in_both_languages() -> None:
     assert DISCLAIMERS[Locale.JA].startswith("※") and "medical" in DISCLAIMERS[Locale.EN]
+
+
+# ---------------- ツール結果の言語(ロケールの受け渡し) ----------------
+import re  # noqa: E402
+from uuid import UUID  # noqa: E402
+
+from health_insight_agent.analysis.health_score import (  # noqa: E402
+    NutritionFeatures,
+    SleepFeatures,
+    WeightFeatures,
+    WorkoutFeatures,
+    analyze_nutrition,
+    analyze_sleep,
+    analyze_weight,
+    analyze_workout,
+)
+from health_insight_agent.ml import features as F  # noqa: E402
+from health_insight_agent.tools.base import (  # noqa: E402
+    Tool,
+    ToolArgs,
+    ToolOutput,
+    ToolRegistry,
+    current_locale,
+)
+
+JAPANESE = re.compile(r"[぀-ヿ一-鿿]")
+
+
+class _NoArgs(ToolArgs):
+    pass
+
+
+def _locale_tool() -> ToolRegistry:
+    def handler(user_id: UUID, a: _NoArgs) -> ToolOutput:
+        return ToolOutput(data={"locale": current_locale()}, rows_used=0)
+
+    return ToolRegistry([Tool("which_locale", "d", _NoArgs, handler)])
+
+
+def test_tool_handlers_see_the_callers_language_and_it_is_reset_afterwards() -> None:
+    reg, user = _locale_tool(), UUID(int=1)
+    assert reg.execute(user, "which_locale", {}).content["data"]["locale"] == "ja"  # 既定
+    assert reg.execute(user, "which_locale", {}, "en").content["data"]["locale"] == "en"
+    assert current_locale() == "ja"  # 呼び出しが終われば元に戻る(他の呼び出しに漏れない)
+
+
+def test_locale_survives_the_mcp_round_trip() -> None:
+    from health_insight_agent.mcp_server.client import McpToolExecutor
+    from health_insight_agent.mcp_server.server import build_mcp_server
+
+    user = UUID(int=1)
+    ex = McpToolExecutor(build_mcp_server(_locale_tool(), user), user)
+    try:
+        assert ex.execute(user, "which_locale", {}, "en").content["data"]["locale"] == "en"
+        assert ex.execute(user, "which_locale", {}, "ja").content["data"]["locale"] == "ja"
+    finally:
+        ex.close()
+
+
+def test_health_score_findings_are_written_in_the_requested_language() -> None:
+    sleep = SleepFeatures(
+        average_duration_minutes=300.0, insufficient_sleep_days=2, duration_stddev_minutes=10.0
+    )
+    results = {
+        "sleep": (analyze_sleep(sleep, "ja"), analyze_sleep(sleep, "en")),
+        "weight": (
+            analyze_weight(
+                WeightFeatures(moving_average_kg=60, change_kg=2, change_rate=0.03), "ja"
+            ),
+            analyze_weight(
+                WeightFeatures(moving_average_kg=60, change_kg=2, change_rate=0.03), "en"
+            ),
+        ),
+        "workout": (
+            analyze_workout(
+                WorkoutFeatures(
+                    session_count=1, total_cardio_minutes=20, total_strength_volume_kg=900.0
+                ),
+                "ja",
+            ),
+            analyze_workout(
+                WorkoutFeatures(
+                    session_count=1, total_cardio_minutes=20, total_strength_volume_kg=900.0
+                ),
+                "en",
+            ),
+        ),
+        "nutrition": (
+            analyze_nutrition(
+                NutritionFeatures(
+                    total_calories=2000, protein_ratio=0.1, fat_ratio=0.35, carbohydrate_ratio=0.55
+                ),
+                "ja",
+            ),
+            analyze_nutrition(
+                NutritionFeatures(
+                    total_calories=2000, protein_ratio=0.1, fat_ratio=0.35, carbohydrate_ratio=0.55
+                ),
+                "en",
+            ),
+        ),
+        "no-data": (
+            analyze_sleep(
+                SleepFeatures(
+                    average_duration_minutes=None,
+                    insufficient_sleep_days=0,
+                    duration_stddev_minutes=None,
+                ),
+                "ja",
+            ),
+            analyze_sleep(
+                SleepFeatures(
+                    average_duration_minutes=None,
+                    insufficient_sleep_days=0,
+                    duration_stddev_minutes=None,
+                ),
+                "en",
+            ),
+        ),
+    }
+    for name, (ja, en) in results.items():
+        assert ja.score == en.score, name  # 言語で判定は変わらない
+        assert all(JAPANESE.search(f) for f in ja.findings), name
+        assert not any(JAPANESE.search(f) for f in en.findings), (name, en.findings)
+    assert "5.0 h" in results["sleep"][1].findings[0]  # 睡眠は「分」ではなく時間で述べる
+
+
+def test_model_adoption_reasons_exist_in_english() -> None:
+    _, q = F.build_samples([])
+    assert q.reason == "データが0日分です" and q.reason_en == "No data (0 days)"
+    from tests.unit.test_ml import _series
+
+    _, q40 = F.build_samples(_series(40))
+    assert "データ量が不足" in q40.reason and "Not enough data" in q40.reason_en
+    assert not JAPANESE.search(q40.reason_en)

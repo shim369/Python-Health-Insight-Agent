@@ -55,6 +55,36 @@ class Chart(BaseModel):
     note: str | None = None
 
 
+class FindingRow(BaseModel):
+    label: str
+    mean_a: float | None
+    mean_b: float | None
+    n_a: int
+    n_b: int
+    unit: str
+    verdict_text: str
+    tone: Literal["negative", "positive", "none", "unknown"]
+
+
+class Finding(BaseModel):
+    """統計ツールの結果を、人が読める形にした所見(services/findings.py)。グラフの下に表示する。"""
+
+    kind: Literal["correlation", "comparison"]
+    title: str
+    # correlation
+    verdict_text: str | None = None
+    tone: Literal["negative", "positive", "none", "unknown"] | None = None
+    strength: float | None = None
+    r: float | None = None
+    n: int | None = None
+    reliability: str | None = None
+    reliability_text: str | None = None
+    # comparison
+    n_a: int | None = None
+    n_b: int | None = None
+    rows: list[FindingRow] = Field(default_factory=list)
+
+
 class UsageInfo(BaseModel):
     input_tokens: int
     output_tokens: int
@@ -70,6 +100,7 @@ class ChatResponse(BaseModel):
     status: Literal["ok", "max_tool_calls", "llm_error", "empty"]
     tool_trace: list[ToolTraceItem]
     charts: list[Chart]
+    findings: list[Finding] = Field(default_factory=list)
     usage: UsageInfo
 
 

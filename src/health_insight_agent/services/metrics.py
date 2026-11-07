@@ -184,6 +184,27 @@ METRICS: dict[str, Metric] = {
 
 METRIC_NAMES: tuple[str, ...] = tuple(METRICS)
 
+# 画面に出すときだけ単位を変える指標(値は分のまま保存・計算し、表示でだけ割る)。
+# 「睡眠時間(分)」は読み取りにくいので、7.5 のような「時間」で見せる。
+_DISPLAY: dict[str, tuple[float, str, str]] = {"sleep_duration_min": (60.0, "時間", "h")}
+
+
+def metric_display(name: str, locale: str = "ja") -> tuple[float, str]:
+    """(表示用の割る数, 表示用の単位)。変換が無い指標は(1.0, 元の単位)。"""
+    if name in _DISPLAY:
+        divisor, ja, en = _DISPLAY[name]
+        return divisor, en if locale == "en" else ja
+    m = METRICS.get(name)
+    return 1.0, (m.unit if m else "")
+
+
+def display_value(name: str, value: float | None) -> float | None:
+    """表示用の値(小数2桁まで)。"""
+    if value is None:
+        return None
+    divisor, _ = metric_display(name)
+    return round(value / divisor, 2)
+
 
 def _hour_offset(base_day: date, when: datetime) -> float:
     """base_day の JST 0時から when までの経過時間(時)。24超は日付をまたいだ時刻。"""
@@ -276,3 +297,14 @@ def build_day_rows(
         )
         day += timedelta(days=1)
     return rows
+
+
+def mean_display(name: str, mean: float | None, locale: str = "ja") -> tuple[float | None, str]:
+    """平均値の(表示値, 単位)。0/1のフラグ指標の平均は「該当した日の割合」なので%で見せる。"""
+    if mean is None:
+        return None, metric_display(name, locale)[1]
+    m = METRICS.get(name)
+    if m is not None and m.kind == "flag":
+        return round(mean * 100, 1), "%"
+    divisor, unit = metric_display(name, locale)
+    return round(mean / divisor, 2), unit

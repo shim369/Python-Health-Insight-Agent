@@ -36,7 +36,7 @@ def test_why_bad_sleep_question_runs_compare_days(agent_env: Any) -> None:
     ans = agent.ask(uid, "睡眠が悪かった日の共通点は?")
     assert ans.status == "ok" and [t.name for t in ans.tool_trace] == ["compare_days"]
     assert ans.tool_trace[0].ok and ans.tool_trace[0].rows_used > 50
-    assert "判定=" in ans.text and "医療診断" in ans.text
+    assert "グループA" in ans.text and "医療診断" in ans.text  # 平易な比較文+固定の注意書き
     assert ans.usage.total_tokens > 0 and ans.duration_ms > 0
 
 
@@ -44,7 +44,7 @@ def test_null_pattern_is_answered_as_no_relationship(agent_env: Any) -> None:
     agent, uid = agent_env
     ans = agent.ask(uid, "朝食の量と睡眠時間に影響はある?")
     assert [t.name for t in ans.tool_trace] == ["correlate"]
-    assert "no_clear_relationship" in ans.text
+    assert "明確な関係は見られません" in ans.text  # 内部コードではなく平易な文
 
 
 def test_score_question_uses_both_wrapped_services(agent_env: Any) -> None:
@@ -56,7 +56,7 @@ def test_score_question_uses_both_wrapped_services(agent_env: Any) -> None:
 def test_unknown_user_gets_insufficient_data_not_fabrication(agent_env: Any) -> None:
     agent, _ = agent_env
     ans = agent.ask(UUID(int=12345), "睡眠が悪かった日の共通点は?")
-    assert "insufficient_data" in ans.text
+    assert "判断できません" in ans.text
     assert (FIXED_END_DATE - timedelta(days=1)).isoformat()  # 日付はテスト固定
 
 

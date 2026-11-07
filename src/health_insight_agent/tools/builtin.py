@@ -26,9 +26,22 @@ from health_insight_agent.services.insight_data_service import (
     InsightDataService,
     InvalidRequestError,
 )
-from health_insight_agent.services.metrics import METRIC_NAMES, METRICS
+from health_insight_agent.services.metrics import (
+    METRIC_NAMES,
+    METRICS,
+    display_value,
+    mean_display,
+    metric_display,
+)
 from health_insight_agent.tools import charts
-from health_insight_agent.tools.base import Tool, ToolArgs, ToolOutput, ToolRegistry, iso_jst
+from health_insight_agent.tools.base import (
+    Tool,
+    ToolArgs,
+    ToolOutput,
+    ToolRegistry,
+    current_locale,
+    iso_jst,
+)
 
 MAX_ROWS = 200
 _METRIC_HELP = "; ".join(f"{m.name}={m.label_en}" for m in METRICS.values())
@@ -171,10 +184,10 @@ def build_default_registry(
                 charts.line_chart(
                     charts.tr("睡眠時間(起床日ごと)", "Sleep duration by wake-up date"),
                     [
-                        (local_date_of(x.wake_time).isoformat(), float(x.duration_minutes))
+                        (local_date_of(x.wake_time).isoformat(), round(x.duration_minutes / 60, 2))
                         for x in logs[: a.limit]
                     ],
-                    y_label=charts.tr("分", "min"),
+                    y_label=charts.tr("時間", "h"),
                 )
             ]
             if rows
@@ -283,8 +296,8 @@ def build_default_registry(
             charts=[
                 charts.bar_chart(
                     charts.tr(
-                        f"{METRICS[m.metric].label_ja}({METRICS[m.metric].unit})",
-                        f"{METRICS[m.metric].label_en} ({METRICS[m.metric].unit})",
+                        f"{METRICS[m.metric].label_ja}({mean_display(m.metric, None, 'ja')[1]})",
+                        f"{METRICS[m.metric].label_en} ({mean_display(m.metric, None, 'en')[1]})",
                     ),
                     [
                         (
@@ -292,17 +305,19 @@ def build_default_registry(
                                 f"条件に該当 n={m.comparison.group_a.n}",
                                 f"Matching n={m.comparison.group_a.n}",
                             ),
-                            m.comparison.group_a.mean or 0.0,
+                            mean_display(m.metric, m.comparison.group_a.mean)[0] or 0.0,
                         ),
                         (
                             charts.tr(
                                 f"それ以外 n={m.comparison.group_b.n}",
                                 f"Others n={m.comparison.group_b.n}",
                             ),
-                            m.comparison.group_b.mean or 0.0,
+                            mean_display(m.metric, m.comparison.group_b.mean)[0] or 0.0,
                         ),
                     ],
-                    y_label=METRICS[m.metric].unit,
+                    y_label=charts.tr(
+                        mean_display(m.metric, None, "ja")[1], mean_display(m.metric, None, "en")[1]
+                    ),
                 )
                 for m in r.metrics
                 if m.comparison.group_a.n and m.comparison.group_b.n
@@ -337,14 +352,18 @@ def build_default_registry(
                         f"{METRICS[r.x].label_ja} × {METRICS[r.y].label_ja}",
                         f"{METRICS[r.x].label_en} × {METRICS[r.y].label_en}",
                     ),
-                    [(p[1], p[2]) for p in r.pairs],
+                    # 睡眠時間は「分」ではなく「時間」で描く(7.5 のほうが読み取りやすい)
+                    [
+                        (display_value(r.x, p[1]) or 0.0, display_value(r.y, p[2]) or 0.0)
+                        for p in r.pairs
+                    ],
                     x_label=charts.tr(
-                        f"{METRICS[r.x].label_ja}({METRICS[r.x].unit})",
-                        f"{METRICS[r.x].label_en} ({METRICS[r.x].unit})",
+                        f"{METRICS[r.x].label_ja}({metric_display(r.x, 'ja')[1]})",
+                        f"{METRICS[r.x].label_en} ({metric_display(r.x, 'en')[1]})",
                     ),
                     y_label=charts.tr(
-                        f"{METRICS[r.y].label_ja}({METRICS[r.y].unit})",
-                        f"{METRICS[r.y].label_en} ({METRICS[r.y].unit})",
+                        f"{METRICS[r.y].label_ja}({metric_display(r.y, 'ja')[1]})",
+                        f"{METRICS[r.y].label_en} ({metric_display(r.y, 'en')[1]})",
                     ),
                 )
             ]
@@ -353,7 +372,7 @@ def build_default_registry(
         )
 
     def health_score(user_id: UUID, a: _AsOfArgs) -> ToolOutput:
-        rep = health.report(user_id, a.as_of_date or data.today())
+        rep = health.report(user_id, a.as_of_date or data.today(), current_locale())
         s = rep.health_score
         domains = {
             name: {"score": round(res.score, 1), "findings": res.findings}
@@ -387,7 +406,7 @@ def build_default_registry(
         )
 
     def recommendations(user_id: UUID, a: _AsOfArgs) -> ToolOutput:
-        rep = health.report(user_id, a.as_of_date or data.today())
+        rep = health.report(user_id, a.as_of_date or data.today(), current_locale())
         return ToolOutput(
             data={
                 "as_of": rep.as_of.isoformat(),
