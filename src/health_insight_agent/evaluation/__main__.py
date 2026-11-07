@@ -17,7 +17,7 @@ from pathlib import Path
 
 from health_insight_agent.config import PROJECT_ROOT, load_settings
 from health_insight_agent.evaluation.configs import PRESETS, build_eval_agent
-from health_insight_agent.evaluation.context import build_context, seed_eval_data
+from health_insight_agent.evaluation.context import EvalContext, build_context, seed_eval_data
 from health_insight_agent.evaluation.questions import get_questions
 from health_insight_agent.evaluation.runner import (
     QuestionResult,
@@ -27,6 +27,23 @@ from health_insight_agent.evaluation.runner import (
     save_results,
     summarize,
 )
+
+
+def _preamble(ctx: EvalContext, configs: list[str], n_questions: int) -> str:
+    cmd = "uv run python -m health_insight_agent.evaluation"
+    flags = " ".join(f"--config {c}" for c in configs)
+    ds = ctx.dataset
+    return (
+        "# 評価結果\n\n"
+        f"- 生成日: {datetime.now():%Y-%m-%d}\n"
+        f"- 再現コマンド: `{cmd} {flags} --write-docs docs/evaluation-results.md`\n"
+        f"- データ: 合成データ(食事{len(ds.meal_logs)}件・睡眠{len(ds.sleep_logs)}件、固定シード)。"
+        "実データは使っていません。\n"
+        f"- 質問: {n_questions}問。採点は決定的(LLM採点なし): ツール選択・ツール結果の証拠・"
+        "回答の正規表現・数値の根拠・禁止表現。\n"
+        "- `fake-*` はキー不要のルールベース(LLM抜きのベースライン)。Geminiの結果は"
+        "README「実キーで評価する」の手順で測定できます(この表には含まれません)。\n\n"
+    )
 
 
 def main() -> None:
@@ -91,7 +108,10 @@ def main() -> None:
         if found is not None and found.rate < float(rate):
             failed.append(f"{name}: {found.rate:.0%} < {float(rate):.0%}")
     if args.write_docs:
-        args.write_docs.write_text(render_markdown(summaries, by_config), encoding="utf-8")
+        preamble = _preamble(ctx, list(by_config), len(questions))
+        args.write_docs.write_text(
+            preamble + render_markdown(summaries, by_config), encoding="utf-8"
+        )
         print(f"wrote: {args.write_docs}")
     if failed:
         raise SystemExit("評価の正答率が基準を下回りました: " + "; ".join(failed))
