@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { ChatResponse, Locale } from "../api/types";
 import { t } from "../lib/strings";
 import { ChartView } from "./Charts";
@@ -40,30 +41,77 @@ export function splitUnknown(text: string): { body: string; unknown: string | nu
   return { body, unknown };
 }
 
-/** 「- 」で始まる行は箇条書き、それ以外は段落として描画する(最小限の整形)。 */
-function AnswerText({ text }: { text: string }) {
-  const blocks: { list: boolean; lines: string[] }[] = [];
-  for (const line of text.split("\n")) {
-    if (line.trim() === "") continue;
-    const isItem = /^\s*[-・]\s+/.test(line);
-    const cleaned = isItem ? line.replace(/^\s*[-・]\s+/, "") : line;
-    const last = blocks[blocks.length - 1];
-    if (isItem && last?.list) last.lines.push(cleaned);
-    else blocks.push({ list: isItem, lines: [cleaned] });
+/** インライン記法(**太字** と `コード`)を、HTML文字列ではなくReact要素に変換する(XSS対策)。 */
+export function renderInline(text: string): ReactNode[] {
+  // LaTeX風の $...$ はそのまま見せると読みにくいので、囲みの$だけ外す
+  const plain = text.replace(/\$([^$\n]{1,60})\$/g, "$1");
+  const out: ReactNode[] = [];
+  const re = /\*\*([^*\n]+)\*\*|`([^`\n]+)`/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = re.exec(plain)) !== null) {
+    if (m.index > last) out.push(plain.slice(last, m.index));
+    out.push(m[1] !== undefined ? <strong key={key++}>{m[1]}</strong> : <code key={key++}>{m[2]}</code>);
+    last = m.index + m[0].length;
   }
+  if (last < plain.length) out.push(plain.slice(last));
+  return out;
+}
+
+type Block =
+  | { kind: "p"; lines: string[] }
+  | { kind: "heading"; text: string }
+  | { kind: "ul"; items: string[] }
+  | { kind: "ol"; items: string[] };
+
+const BULLET = /^\s*[-*・]\s+/;
+const ORDERED = /^\s*\d+[.)]\s+/;
+const HEADING = /^\s*#{1,6}\s+/;
+const RULE = /^\s*(-{3,}|\*{3,}|_{3,})\s*$/;
+
+/** 最小限のMarkdown整形: 見出し・箇条書き・番号付きリスト・区切り線・太字・コード。 */
+export function parseBlocks(text: string): Block[] {
+  const blocks: Block[] = [];
+  for (const raw of text.split("\n")) {
+    if (raw.trim() === "" || RULE.test(raw)) continue;
+    const last = blocks[blocks.length - 1];
+    if (HEADING.test(raw)) {
+      blocks.push({ kind: "heading", text: raw.replace(HEADING, "") });
+    } else if (BULLET.test(raw)) {
+      const item = raw.replace(BULLET, "");
+      if (last?.kind === "ul") last.items.push(item);
+      else blocks.push({ kind: "ul", items: [item] });
+    } else if (ORDERED.test(raw)) {
+      const item = raw.replace(ORDERED, "");
+      if (last?.kind === "ol") last.items.push(item);
+      else blocks.push({ kind: "ol", items: [item] });
+    } else if (last?.kind === "p") {
+      last.lines.push(raw);
+    } else {
+      blocks.push({ kind: "p", lines: [raw] });
+    }
+  }
+  return blocks;
+}
+
+function AnswerText({ text }: { text: string }) {
   return (
     <div className="text">
-      {blocks.map((b, i) =>
-        b.list ? (
-          <ul key={i}>
-            {b.lines.map((l, j) => (
-              <li key={j}>{l}</li>
-            ))}
-          </ul>
-        ) : (
-          <p key={i}>{b.lines.join("\n")}</p>
-        ),
-      )}
+      {parseBlocks(text).map((b, i) => {
+        if (b.kind === "heading") return <p key={i} className="answer-heading">{renderInline(b.text)}</p>;
+        if (b.kind === "ul" || b.kind === "ol") {
+          const List = b.kind;
+          return (
+            <List key={i}>
+              {b.items.map((item, j) => (
+                <li key={j}>{renderInline(item)}</li>
+              ))}
+            </List>
+          );
+        }
+        return <p key={i}>{renderInline(b.lines.join("\n"))}</p>;
+      })}
     </div>
   );
 }

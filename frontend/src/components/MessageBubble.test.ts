@@ -27,3 +27,23 @@ describe("splitDisclaimer", () => {
     expect(splitDisclaimer("本文").disclaimer).toBeNull();
   });
 });
+
+import { parseBlocks, renderInline } from "./MessageBubble";
+
+describe("markdown-ish answers from a real LLM", () => {
+  it("turns headings, rules, numbered and bullet lists into blocks", () => {
+    const blocks = parseBlocks("### 1. 結果\n---\n1. 一つ目\n2. 二つ目\n* 箇条書き\n本文");
+    expect(blocks.map((b) => b.kind)).toEqual(["heading", "ol", "ul", "p"]);
+    expect(blocks[0]).toEqual({ kind: "heading", text: "1. 結果" });
+    expect(blocks[1]).toMatchObject({ items: ["一つ目", "二つ目"] });
+  });
+
+  it("renders **bold** and `code` as elements and strips LaTeX dollars, never raw HTML", () => {
+    const out = renderInline("相関は **強い** で `r` は $r = -0.67$ です <b>x</b>");
+    const kinds = out.map((n) => (typeof n === "string" ? "text" : (n as { type: string }).type));
+    expect(kinds).toEqual(["text", "strong", "text", "code", "text"]);
+    expect(out.filter((n) => typeof n === "string").join("")).toContain("r = -0.67");
+    expect(out.filter((n) => typeof n === "string").join("")).not.toContain("$");
+    expect(out.filter((n) => typeof n === "string").join("")).toContain("<b>x</b>"); // タグは文字として表示
+  });
+});

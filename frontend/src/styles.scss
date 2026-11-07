@@ -481,8 +481,42 @@ button {
 
   p + p,
   p + ul,
-  ul + p {
+  ul + p,
+  p + ol,
+  ol + p,
+  ul + ol,
+  ol + ul {
     margin-top: 10px;
+  }
+
+  .answer-heading {
+    font-weight: 700;
+    margin-top: 14px;
+  }
+
+  .answer-heading:first-child {
+    margin-top: 0;
+  }
+
+  strong {
+    font-weight: 700;
+  }
+
+  code {
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+
+  ol {
+    margin: 0;
+    padding-left: 1.4em;
+
+    li + li {
+      margin-top: 4px;
+    }
   }
 
   ul {
