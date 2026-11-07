@@ -33,6 +33,8 @@ from health_insight_agent.ai.retry_policy import DEFAULT_RETRY_POLICY, RetryPoli
 DEFAULT_EMBEDDING_MODEL = "gemini-embedding-2"
 """公式モデル一覧(2026-11)の最新の埋め込みモデル。GEMINI_EMBEDDING_MODELで変更可。"""
 _BATCH_SIZE = 100
+OUTPUT_DIMENSIONS = 768
+"""埋め込みの次元数。既定(3072)は大きく、キャッシュ・検索が重くなるため、MRL対応モデルの768に縮める。"""
 
 
 class HashingEmbeddingProvider:
@@ -116,7 +118,13 @@ class GeminiEmbeddingProvider:
 
     def _embed_once(self, batch: list[str]) -> list[list[float]]:
         try:
-            resp = self._client.models.embed_content(model=self._model, contents=batch)
+            # 重要: gemini-embedding-2 はマルチモーダルで、文字列のリストをそのまま渡すと全体を
+            # 「1つの入力」として1本に合成してしまう(実キーで確認)。1件ずつContentで包んで渡す。
+            resp = self._client.models.embed_content(
+                model=self._model,
+                contents=[types.Content(parts=[types.Part(text=t)]) for t in batch],
+                config=types.EmbedContentConfig(output_dimensionality=OUTPUT_DIMENSIONS),
+            )
         except errors.APIError as e:
             if e.code == 429:
                 raise AIRateLimitError(str(e)) from e

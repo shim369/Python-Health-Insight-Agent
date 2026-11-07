@@ -103,8 +103,10 @@ class _EmbedModels:
     def __init__(self, outcomes: list[Any]) -> None:
         self.outcomes = outcomes
         self.batches: list[list[str]] = []
+        self.configs: list[Any] = []
 
-    def embed_content(self, *, model: str, contents: list[str]) -> Any:
+    def embed_content(self, *, model: str, contents: list[Any], config: Any = None) -> Any:
+        self.configs.append(config)
         self.batches.append(contents)
         out = self.outcomes.pop(0) if self.outcomes else None
         if isinstance(out, BaseException):
@@ -144,3 +146,15 @@ def test_gemini_embeddings_give_up_and_validate_response() -> None:
     p2, _, _ = _gemini([1])  # 2件要求に1件だけ返る
     with pytest.raises(AIValidationError):
         p2.embed(["a", "b"])
+
+
+def test_each_text_is_sent_as_its_own_content_with_a_reduced_dimension() -> None:
+    """gemini-embedding-2はリストを1つの入力に合成する(実キーで確認)ので、1件ずつContentで包む。"""
+    from google.genai import types
+
+    p, models, _ = _gemini([])
+    p.embed(["夜遅くに食べた", "朝は忙しかった"])
+    [batch] = models.batches
+    assert all(isinstance(c, types.Content) for c in batch)
+    assert [c.parts[0].text for c in batch] == ["夜遅くに食べた", "朝は忙しかった"]
+    assert models.configs[0].output_dimensionality == 768

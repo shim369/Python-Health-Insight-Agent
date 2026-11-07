@@ -9,6 +9,7 @@ from pathlib import Path
 from health_insight_agent.agent.loop import AgentConfig, HealthInsightAgent
 from health_insight_agent.agent.prompts import MODEL_RULE, NOTES_RULE, SQL_RULE
 from health_insight_agent.agent.usage_log import JsonlSink, QuerySink, logging_sink
+from health_insight_agent.ai.embeddings import OUTPUT_DIMENSIONS
 from health_insight_agent.ai.factory import build_embedding_provider, build_llm_provider
 from health_insight_agent.ai.protocols import LLMProvider
 from health_insight_agent.config import PROJECT_ROOT, Settings
@@ -47,7 +48,9 @@ def build_registry(
         NumpyVectorStore(),
         # 同じメモを再度埋め込まないためのキャッシュ(コスト管理)。モデルごとに名前空間を分ける。
         cache=EmbeddingCache(
-            f"{settings.ai_provider}:{type(embedder).__name__}",
+            # モデル名と次元数も名前空間に含め、設定を変えたときに古いベクトルを使い回さない
+            f"{settings.ai_provider}:{type(embedder).__name__}:"
+            f"{getattr(embedder, 'model', '')}:{OUTPUT_DIMENSIONS}",
             PROJECT_ROOT / ".cache" / f"embeddings-{settings.ai_provider}.json",
         ),
         clock=clock,
