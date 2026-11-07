@@ -124,6 +124,9 @@ class ToolRegistry:
             specs.append(ToolSpec(name=t.name, description=t.description, parameters_schema=schema))
         return specs
 
+    def close(self) -> None:
+        """ToolExecutor Protocol用。直接呼び出しは解放するものが無い。"""
+
     def execute(self, user_id: UUID, name: str, arguments: dict[str, Any]) -> ToolExecution:
         started = time.perf_counter()
 

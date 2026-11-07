@@ -26,7 +26,8 @@ from health_insight_agent.ai.protocols import LLMProvider, Message, TokenUsage, 
 from health_insight_agent.domain.enums import Locale
 from health_insight_agent.local_time import local_today
 from health_insight_agent.logging_config import get_logger
-from health_insight_agent.tools.base import ToolExecution, ToolRegistry
+from health_insight_agent.tools.base import ToolExecution
+from health_insight_agent.tools.executor import ToolExecutor
 
 logger = get_logger(__name__)
 
@@ -70,7 +71,7 @@ class HealthInsightAgent:
     def __init__(
         self,
         llm: LLMProvider,
-        registry: ToolRegistry,
+        registry: ToolExecutor,
         *,
         config: AgentConfig | None = None,
         today: Callable[[], date] = local_today,
@@ -81,6 +82,9 @@ class HealthInsightAgent:
         self._config = config or AgentConfig()
         self._today = today
         self._sink = sink
+
+    def close(self) -> None:
+        self._registry.close()
 
     @property
     def max_tool_calls(self) -> int:
