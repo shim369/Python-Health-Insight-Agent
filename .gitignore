@@ -30,3 +30,4 @@ frontend/dist/
 
 .DS_Store
 logs/
+.cache/
