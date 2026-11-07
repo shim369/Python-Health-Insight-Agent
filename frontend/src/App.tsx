@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import type { Locale } from "./api/types";
 import { ChatView } from "./components/ChatView";
+import { LogoMark } from "./components/Icons";
 import { t } from "./lib/strings";
+
+const LOCALES: { value: Locale; label: string }[] = [
+  { value: "ja", label: "日本語" },
+  { value: "en", label: "English" },
+];
 
 export function App() {
   const [locale, setLocale] = useState<Locale>("ja");
@@ -11,21 +17,34 @@ export function App() {
     document.documentElement.lang = locale;
   }, [locale]);
   return (
-    <div className="app">
+    <div className="shell">
       <header className="app-header">
-        <div>
-          <h1>{s.title}</h1>
-          <p className="muted">{s.subtitle}</p>
+        <div className="brand">
+          <LogoMark />
+          <div>
+            <h1>{s.title}</h1>
+            <p className="muted">{s.subtitle}</p>
+          </div>
         </div>
-        <label className="lang">
-          <span className="visually-hidden">Language</span>
-          <select value={locale} onChange={(e) => setLocale(e.target.value as Locale)}>
-            <option value="ja">日本語</option>
-            <option value="en">English</option>
-          </select>
-        </label>
+        <div className="header-actions">
+          <span className="badge demo">{s.demoBadge}</span>
+          <div className="segmented" role="group" aria-label="Language">
+            {LOCALES.map((l) => (
+              <button
+                key={l.value}
+                type="button"
+                aria-pressed={locale === l.value}
+                onClick={() => setLocale(l.value)}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </header>
-      <ChatView locale={locale} />
+      <div className="app">
+        <ChatView locale={locale} />
+      </div>
     </div>
   );
 }

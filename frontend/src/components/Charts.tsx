@@ -7,6 +7,22 @@ const W = 480;
 const H = 220;
 const M = { top: 12, right: 16, bottom: 44, left: 52 };
 
+/** グラデーション定義(各SVGに置く。同じidでも内容は同じ)。 */
+function Defs() {
+  return (
+    <defs>
+      <linearGradient id="hia-bar" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="var(--chart-1)" />
+        <stop offset="100%" stopColor="var(--chart-2)" />
+      </linearGradient>
+      <linearGradient id="hia-area" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.28" />
+        <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0" />
+      </linearGradient>
+    </defs>
+  );
+}
+
 function Axes({ yTicks, y, yLabel }: { yTicks: number[]; y: (v: number) => number; yLabel?: string | null }) {
   return (
     <g className="axes">
@@ -43,12 +59,20 @@ function BarChart({ chart }: { chart: Chart }) {
   const showEvery = Math.ceil(pts.length / 12);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={chart.title} className="chart-svg">
+      <Defs />
       <Axes yTicks={ticks} y={y} yLabel={chart.y_label} />
       {pts.map((p, i) => {
         const cx = M.left + slot * i + slot / 2;
         return (
           <g key={i}>
-            <rect x={cx - barW / 2} y={Math.min(y(p.y), y(0))} width={barW} height={Math.abs(y(0) - y(p.y))} className="bar" />
+            <rect
+              x={cx - barW / 2}
+              y={Math.min(y(p.y), y(0))}
+              width={barW}
+              height={Math.abs(y(0) - y(p.y))}
+              rx={5}
+              className="bar"
+            />
             {pts.length <= 8 ? (
               <text x={cx} y={Math.min(y(p.y), y(0)) - 4} textAnchor="middle" className="value-label">
                 {formatNumber(p.y)}
@@ -77,7 +101,14 @@ function LineChart({ chart }: { chart: Chart }) {
   const showEvery = Math.ceil(pts.length / 6);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={chart.title} className="chart-svg">
+      <Defs />
       <Axes yTicks={ticks} y={y} yLabel={chart.y_label} />
+      {pts.length > 1 ? (
+        <path
+          d={`${d} L${x(pts.length - 1).toFixed(1)},${H - M.bottom} L${x(0).toFixed(1)},${H - M.bottom} Z`}
+          className="area"
+        />
+      ) : null}
       <path d={d} className="line" fill="none" />
       {pts.map((p, i) => (
         <g key={i}>
@@ -103,6 +134,7 @@ function ScatterChart({ chart }: { chart: Chart }) {
   const y = scaleLinear({ min: Math.min(yd.min, yt[0]), max: Math.max(yd.max, yt[yt.length - 1]) }, [H - M.bottom, M.top]);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={chart.title} className="chart-svg">
+      <Defs />
       <Axes yTicks={yt} y={y} yLabel={chart.y_label} />
       {xt.map((tv) => (
         <text key={tv} x={x(tv)} y={H - M.bottom + 14} textAnchor="middle" className="tick">

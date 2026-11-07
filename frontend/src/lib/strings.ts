@@ -2,8 +2,13 @@ import type { Locale } from "../api/types";
 
 const ja = {
   title: "Health Insight Agent",
-  subtitle: "食事・運動・睡眠ログを調べて、根拠つきで答えます(デモ: 合成データ)",
-  placeholder: "質問を入力(Enterで送信、Shift+Enterで改行)",
+  subtitle: "食事・運動・睡眠ログを調べて、根拠つきで答えます",
+  heroTitle: "今日は何を調べますか?",
+  heroText: "データを調べ、使ったツール・件数・統計とあわせて答えます。わからないことは「わからない」と答えます。",
+  demoBadge: "合成データのデモ",
+  hint: "Enterで送信 · Shift+Enterで改行",
+  footnote: "医療診断・治療の助言ではありません",
+  placeholder: "質問を入力してください",
   send: "送信",
   thinking: "データを調べています…",
   tools: "使ったツールと結果",
@@ -37,8 +42,13 @@ const ja = {
 
 const en: typeof ja = {
   title: "Health Insight Agent",
-  subtitle: "Investigates your meal/workout/sleep logs and answers with evidence (demo: synthetic data)",
-  placeholder: "Ask a question (Enter to send, Shift+Enter for newline)",
+  subtitle: "Investigates your meal, workout and sleep logs and answers with evidence",
+  heroTitle: "What would you like to look into?",
+  heroText: "It checks your data and answers together with the tools, record counts and statistics it used. If it cannot tell, it says so.",
+  demoBadge: "Synthetic-data demo",
+  hint: "Enter to send · Shift+Enter for newline",
+  footnote: "Not medical diagnosis or treatment advice",
+  placeholder: "Ask a question",
   send: "Send",
   thinking: "Looking into your data…",
   tools: "Tools used and results",

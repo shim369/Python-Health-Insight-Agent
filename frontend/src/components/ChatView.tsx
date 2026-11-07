@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, postChat } from "../api/client";
 import type { HistoryItem, Locale } from "../api/types";
 import { t } from "../lib/strings";
+import { IconInfo, IconSend, SUGGESTION_ICONS } from "./Icons";
 import { MessageBubble, type UiMessage } from "./MessageBubble";
 
 export function ChatView({ locale }: { locale: Locale }) {
@@ -85,15 +86,23 @@ export function ChatView({ locale }: { locale: Locale }) {
     <main className="chat">
       <section className="messages" aria-live="polite">
         {messages.length === 0 ? (
-          <div className="empty">
+          <div className="hero">
+            <h2>{s.heroTitle}</h2>
+            <p className="muted">{s.heroText}</p>
             <ul className="suggestions">
-              {s.suggestions.map((q) => (
-                <li key={q}>
-                  <button type="button" onClick={() => submit(q)}>
-                    {q}
-                  </button>
-                </li>
-              ))}
+              {s.suggestions.map((q, i) => {
+                const Icon = SUGGESTION_ICONS[i % SUGGESTION_ICONS.length];
+                return (
+                  <li key={q}>
+                    <button type="button" onClick={() => submit(q)}>
+                      <span className="suggestion-icon">
+                        <Icon />
+                      </span>
+                      <span>{q}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ) : null}
@@ -107,7 +116,12 @@ export function ChatView({ locale }: { locale: Locale }) {
         ))}
         {loading ? (
           <div className="loading" role="status">
-            <span className="spinner" aria-hidden="true" /> {s.thinking}
+            <span className="typing" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            {s.thinking}
           </div>
         ) : null}
         <div ref={bottomRef} />
@@ -119,25 +133,31 @@ export function ChatView({ locale }: { locale: Locale }) {
           submit(input);
         }}
       >
-        <textarea
-          value={input}
-          rows={2}
-          maxLength={2000}
-          placeholder={s.placeholder}
-          aria-label={s.placeholder}
-          disabled={loading}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            // 日本語入力の変換確定のEnterでは送信しない(isComposing)。
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              submit(input);
-            }
-          }}
-        />
-        <button type="submit" disabled={loading || input.trim() === ""}>
-          {s.send}
-        </button>
+        <div className="composer-box">
+          <textarea
+            value={input}
+            rows={1}
+            maxLength={2000}
+            placeholder={s.placeholder}
+            aria-label={s.placeholder}
+            disabled={loading}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              // 日本語入力の変換確定のEnterでは送信しない(isComposing)。
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit(input);
+              }
+            }}
+          />
+          <button type="submit" className="send" disabled={loading || input.trim() === ""}>
+            <IconSend />
+            <span className="visually-hidden">{s.send}</span>
+          </button>
+        </div>
+        <p className="composer-note muted small">
+          <IconInfo /> {s.hint} · {s.footnote}
+        </p>
       </form>
     </main>
   );

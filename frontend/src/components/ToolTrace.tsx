@@ -1,5 +1,6 @@
 import type { Locale, ToolTraceItem } from "../api/types";
 import { t } from "../lib/strings";
+import { IconTool } from "./Icons";
 
 export function ToolTrace({ trace, locale }: { trace: ToolTraceItem[]; locale: Locale }) {
   const s = t(locale);
@@ -7,6 +8,7 @@ export function ToolTrace({ trace, locale }: { trace: ToolTraceItem[]; locale: L
   return (
     <details className="tool-trace">
       <summary>
+        <IconTool />
         {s.tools} ({trace.length})
       </summary>
       <ol>
