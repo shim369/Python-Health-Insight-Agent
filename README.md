@@ -31,6 +31,30 @@ and the keyless demo LLM all switch between **English and Japanese** (language s
 exercise names) stays in the language it was written in, and earlier messages in a chat keep the
 language they were asked in.
 
+## Screenshots
+
+All screenshots use **synthetic data** and the **keyless demo LLM** (`AI_PROVIDER=fake`, shown as `fake-rule` in the
+usage chips). A real Gemini answers in its own words but uses the same tools, charts and finding cards.
+
+**Start screen** (Japanese UI): suggested questions, a full-width header, the language toggle and the *New chat* button.
+
+![Start screen](docs/images/01-start-ja.jpg)
+
+**Answer with a chart and, right below it, a plain-language finding card**: a strength meter, the correlation `r`, the
+number of records and the reliability; the fixed disclaimer sits inside the bubble and "what is unknown" under it.
+
+![Scatter chart of late meals versus sleep duration](docs/images/02-chart-ja.jpg)
+![Finding card with strength meter](docs/images/03-finding-card-ja.jpg)
+
+**Group comparison** (English UI): sleep is shown in hours, flag metrics as the share of days, and each row has a verdict.
+
+![Group comparison table](docs/images/04-comparison-en.jpg)
+
+**Prediction from the custom model**: always labelled *Model-based reference value*, with the model's error (MAE) and
+its improvement over the baseline.
+
+![Predicted sleep with the reference-value label](docs/images/05-prediction-en.jpg)
+
 ## Highlights
 
 | Topic | What it does | Where |
