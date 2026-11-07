@@ -5,11 +5,14 @@ from __future__ import annotations
 from datetime import date
 
 from health_insight_agent.agent.loop import AgentConfig, HealthInsightAgent
+from health_insight_agent.agent.prompts import NOTES_RULE
 from health_insight_agent.agent.usage_log import JsonlSink, QuerySink, logging_sink
-from health_insight_agent.ai.factory import build_llm_provider
+from health_insight_agent.ai.factory import build_embedding_provider, build_llm_provider
 from health_insight_agent.ai.protocols import LLMProvider
 from health_insight_agent.config import PROJECT_ROOT, Settings
 from health_insight_agent.local_time import local_today
+from health_insight_agent.rag.note_search import EmbeddingCache, NoteSearchService
+from health_insight_agent.rag.vector_store import NumpyVectorStore
 from health_insight_agent.repositories.sqlalchemy.factory import build_uow_factory
 from health_insight_agent.services.health_insight_service import LocalHealthInsightService
 from health_insight_agent.services.insight_data_service import InsightDataService
@@ -23,8 +26,22 @@ def build_registry(settings: Settings, *, today: date | None = None) -> ToolRegi
     url = settings.readonly_database_url or settings.database_url
     uow_factory = build_uow_factory(url, read_only=True)
     clock = (lambda: today) if today else local_today
+    embedder = build_embedding_provider(settings.ai_provider)
+    notes = NoteSearchService(
+        uow_factory,
+        embedder,
+        NumpyVectorStore(),
+        # 同じメモを再度埋め込まないためのキャッシュ(コスト管理)。モデルごとに名前空間を分ける。
+        cache=EmbeddingCache(
+            f"{settings.ai_provider}:{type(embedder).__name__}",
+            PROJECT_ROOT / ".cache" / f"embeddings-{settings.ai_provider}.json",
+        ),
+        clock=clock,
+    )
     return build_default_registry(
-        InsightDataService(uow_factory, clock=clock), LocalHealthInsightService(uow_factory)
+        InsightDataService(uow_factory, clock=clock),
+        LocalHealthInsightService(uow_factory),
+        notes,
     )
 
 
@@ -39,7 +56,7 @@ def build_agent(
     return HealthInsightAgent(
         llm or build_llm_provider(settings.ai_provider, model=settings.gemini_model),
         build_registry(settings, today=today),
-        config=config or AgentConfig(),
+        config=config or AgentConfig(extra_rules=(NOTES_RULE,)),
         today=(lambda: today) if today else local_today,
         sink=sink or JsonlSink(PROJECT_ROOT / "logs" / "agent_queries.jsonl"),
     )

@@ -15,12 +15,14 @@ from pydantic import Field
 from health_insight_agent.domain.intensity import estimated_kcal, workout_intensity
 from health_insight_agent.domain.models import MealLog
 from health_insight_agent.local_time import local_date_of
+from health_insight_agent.rag.note_search import NoteSearchService
 from health_insight_agent.services import stats
 from health_insight_agent.services.health_insight_service import HealthInsightPort
 from health_insight_agent.services.insight_data_service import (
     OPERATORS,
     Condition,
     InsightDataService,
+    InvalidRequestError,
 )
 from health_insight_agent.services.metrics import METRIC_NAMES, METRICS
 from health_insight_agent.tools import charts
@@ -33,6 +35,13 @@ _TIMING_HELP = (
     "prev_day_* = meals/workouts of day X-1 (the day BEFORE that sleep, i.e. candidate causes); "
     "same_day_* = condition/weight logged on day X."
 )
+
+
+class _NoteSearchArgs(ToolArgs):
+    query: str = Field(min_length=1, max_length=300, description="What to look for in the notes")
+    top_k: int = Field(default=5, ge=1, le=10, description="How many notes to return")
+    start_date: date | None = Field(default=None, description="Only notes on/after this date")
+    end_date: date | None = Field(default=None, description="Only notes on/before this date")
 
 
 class _Period(ToolArgs):
@@ -115,7 +124,11 @@ def _comparison_json(c: stats.Comparison) -> dict[str, Any]:
     }
 
 
-def build_default_registry(data: InsightDataService, health: HealthInsightPort) -> ToolRegistry:
+def build_default_registry(
+    data: InsightDataService,
+    health: HealthInsightPort,
+    notes: NoteSearchService | None = None,
+) -> ToolRegistry:
     def overview(user_id: UUID, _: _NoArgs) -> ToolOutput:
         o = data.overview(user_id)
         tables = {
@@ -356,6 +369,29 @@ def build_default_registry(data: InsightDataService, health: HealthInsightPort) 
             notes=["rule-based suggestions, not medical advice"],
         )
 
+    def search_notes(user_id: UUID, a: _NoteSearchArgs) -> ToolOutput:
+        assert notes is not None
+        if a.start_date and a.end_date and a.end_date < a.start_date:
+            raise InvalidRequestError("end_date must be on or after start_date")
+        hits, total = notes.search(
+            user_id, a.query, top_k=a.top_k, start=a.start_date, end=a.end_date
+        )
+        return ToolOutput(
+            data={
+                "total_notes_indexed": total,
+                "hits": [
+                    {"date": h.note_date.isoformat(), "text": h.text, "score": round(h.score, 3)}
+                    for h in hits
+                ],
+            },
+            rows_used=len(hits),
+            notes=[
+                "semantic similarity search over the user's own reflection notes",
+                "score is similarity, not relevance or probability; judge relevance from the text",
+                "quote only these notes; no hits does not prove an event did not happen",
+            ],
+        )
+
     reg = ToolRegistry()
     for t in (
         Tool(
@@ -416,4 +452,14 @@ def build_default_registry(data: InsightDataService, health: HealthInsightPort) 
         ),
     ):
         reg.register(t)
+    if notes is not None:
+        reg.register(
+            Tool(
+                "search_notes",
+                "Semantic search over the person's own daily reflection notes (diary-like text). "
+                "Use for questions about what they wrote or felt. Returns dated original text.",
+                _NoteSearchArgs,
+                search_notes,
+            )
+        )
     return reg

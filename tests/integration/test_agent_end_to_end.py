@@ -58,3 +58,22 @@ def test_unknown_user_gets_insufficient_data_not_fabrication(agent_env: Any) -> 
     ans = agent.ask(UUID(int=12345), "睡眠が悪かった日の共通点は?")
     assert "insufficient_data" in ans.text
     assert (FIXED_END_DATE - timedelta(days=1)).isoformat()  # 日付はテスト固定
+
+
+def test_notes_question_uses_search_notes(seeded: Any) -> None:
+    from health_insight_agent.ai.embeddings import HashingEmbeddingProvider
+    from health_insight_agent.rag.note_search import NoteSearchService
+    from health_insight_agent.rag.vector_store import NumpyVectorStore
+
+    factory, uid, _ = seeded
+    reg = build_default_registry(
+        InsightDataService(factory, clock=lambda: FIXED_END_DATE),
+        LocalHealthInsightService(factory),
+        NoteSearchService(factory, HashingEmbeddingProvider(), NumpyVectorStore()),
+    )
+    agent = HealthInsightAgent(
+        RuleBasedFakeLLM(), reg, today=lambda: FIXED_END_DATE, sink=lambda _log: None
+    )
+    ans = agent.ask(uid, "寝不足で眠かった日のメモには何を書いていた?")
+    assert [t.name for t in ans.tool_trace] == ["search_notes"] and ans.tool_trace[0].ok
+    assert "検索" in ans.text and "類似度" in ans.text

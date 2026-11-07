@@ -43,6 +43,12 @@ RULES
 10. Answer in {language}. Be concise and structured."""
 
 
+NOTES_RULE = (
+    "search_notes returns the person's own dated reflection notes. Cite only returned notes "
+    "(with their dates) and never invent note contents. If none are relevant, say so."
+)
+
+
 def build_system_prompt(
     *, today: date, locale: Locale = Locale.JA, extra_rules: Sequence[str] = ()
 ) -> str:
