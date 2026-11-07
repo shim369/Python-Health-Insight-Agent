@@ -33,16 +33,77 @@ def _has(text: str, *words: str) -> bool:
 
 
 def _period(question: str, today: date) -> dict[str, str]:
-    days = 7 if _has(question, "先週", "今週", "week", "直近") else 89
+    days = 7 if _has(question, "先週", "今週", "week", "直近") else 90  # 既定は全期間(90日)
     return {
         "start_date": (today - timedelta(days=days - 1)).isoformat(),
         "end_date": today.isoformat(),
     }
 
 
+# (キーワード, 指標)。長いキーワードを先に書く(「朝食」を「食」より先に拾うため)。
+_METRIC_KEYWORDS: tuple[tuple[str, str], ...] = (
+    ("最後の食事", "prev_day_meal_to_bed_gap_h"),
+    ("寝るまでの時間", "prev_day_meal_to_bed_gap_h"),
+    ("夜遅い食事", "prev_day_late_meal"),
+    ("夕食が遅", "prev_day_late_meal"),
+    ("遅い食事", "prev_day_late_meal"),
+    ("夜遅くに食", "prev_day_late_meal"),
+    ("夜に激しい運動", "prev_day_evening_high_workout"),
+    ("夜の運動", "prev_day_evening_high_workout"),
+    ("運動で消費", "prev_day_workout_kcal"),
+    ("消費", "prev_day_workout_kcal"),
+    ("朝食", "prev_day_breakfast_kcal"),
+    ("疲労", "same_day_fatigue_score"),
+    ("疲れ", "same_day_fatigue_score"),
+    ("ストレス", "same_day_stress_score"),
+    ("体重", "same_day_weight_kg"),
+    ("平日", "is_weekend"),
+    ("休日", "is_weekend"),
+    ("週末", "is_weekend"),
+    ("睡眠時間", "sleep_duration_min"),
+    ("睡眠の質", "sleep_quality_score"),
+    ("就寝", "sleep_bedtime_hour"),
+    ("寝る時間", "sleep_bedtime_hour"),
+    ("食事", "prev_day_late_meal"),
+    ("運動", "prev_day_evening_high_workout"),
+)
+
+
+def _mentioned_metrics(question: str) -> list[str]:
+    """質問文に出てくる指標を、出現順・重複なしで返す(重なる範囲は長いキーワードを優先)。"""
+    found: list[tuple[int, str]] = []
+    taken: list[tuple[int, int]] = []
+    for kw, metric in _METRIC_KEYWORDS:
+        for m in re.finditer(re.escape(kw), question):
+            span = (m.start(), m.end())
+            if any(span[0] < t1 and t0 < span[1] for t0, t1 in taken):
+                continue
+            taken.append(span)
+            found.append((m.start(), metric))
+    out: list[str] = []
+    for _, metric in sorted(found):
+        if metric not in out:
+            out.append(metric)
+    return out
+
+
+_NOTE_FILLERS = re.compile(
+    r"(振り返り)?メモ(に|には|で|を)?|書いて(あっ|い)?た?|書いた|何と|について|日の|日は|はある|あった|"
+    r"ある\?|教えて|だっ(た)?|[?？。、]|[はにをがでの]"
+)
+
+
+def _note_query(question: str) -> str:
+    """質問から定型句を除いた検索語(LLMなら自分で簡潔なクエリを作る部分の代わり)。"""
+    cleaned = _NOTE_FILLERS.sub("", question).strip()
+    return cleaned or question
+
+
 def _plan(question: str, today: date) -> list[ToolCall]:
     q = question.lower()
     period = _period(question, today)
+    if _has(q, "メモ", "日記", "振り返り", "書いて", "note", "diary"):
+        return [ToolCall("c1", "search_notes", {"query": _note_query(question), "top_k": 5})]
     if _has(q, "平日", "休日", "曜日", "sql", "集計"):
         sql = (
             "SELECT CASE WHEN EXTRACT(ISODOW FROM wake_time AT TIME ZONE 'Asia/Tokyo') >= 6 "
@@ -51,13 +112,28 @@ def _plan(question: str, today: date) -> list[ToolCall]:
             "AS avg_sleep_min, COUNT(*) AS n FROM sleep_logs GROUP BY 1 ORDER BY 1"
         )
         return [ToolCall("c1", "run_readonly_sql", {"sql": sql})]
-    if _has(q, "メモ", "日記", "振り返り", "書いて", "note", "diary"):
-        return [ToolCall("c1", "search_notes", {"query": question, "top_k": 5})]
-    if _has(q, "スコア", "score", "おすすめ", "recommend", "改善"):
+    if _has(q, "高強度", "何回") and _has(q, "運動", "workout"):
         return [
-            ToolCall("c1", "get_health_score", {}),
-            ToolCall("c2", "get_recommendations", {}),
+            ToolCall(
+                "c1",
+                "get_workout_logs",
+                {**_period("", today), "limit": 200},
+            )
         ]
+    mentioned = _mentioned_metrics(question)
+    asks_relation = _has(
+        q, "相関", "関係", "影響", "correlat", "どうなる", "遅め", "夜", "違", "差"
+    )
+    if len(mentioned) >= 2 or (mentioned and asks_relation):
+        if len(mentioned) == 1:  # 1つだけなら、結果側は睡眠時間(就寝の話なら就寝時刻)
+            bedtime_topic = _has(q, "就寝", "寝る時間", "bedtime")
+            y = "sleep_bedtime_hour" if bedtime_topic else "sleep_duration_min"
+            x = mentioned[0]
+            if x == y:
+                y = "sleep_duration_min"
+        else:
+            x, y = mentioned[0], mentioned[1]
+        return [ToolCall("c1", "correlate", {**period, "x_metric": x, "y_metric": y})]
     if _has(q, "共通点", "悪かった", "原因", "common", "why"):
         return [
             ToolCall(
@@ -75,20 +151,11 @@ def _plan(question: str, today: date) -> list[ToolCall]:
                 },
             )
         ]
-    if _has(q, "相関", "関係", "影響", "correlat", "どうなる", "遅め", "夜"):
-        x = (
-            "prev_day_breakfast_kcal"  # 「朝食」は「食」より先に判定する(部分一致の取り違え防止)
-            if _has(q, "朝食", "breakfast")
-            else "prev_day_late_meal"
-            if _has(q, "食", "meal", "eat")
-            else "prev_day_evening_high_workout"
-            if _has(q, "運動", "workout")
-            else "same_day_weight_kg"
-            if _has(q, "体重")
-            else "is_weekend"
-        )
-        y = "sleep_bedtime_hour" if _has(q, "就寝", "寝る時間", "bedtime") else "sleep_duration_min"
-        return [ToolCall("c1", "correlate", {**period, "x_metric": x, "y_metric": y})]
+    if _has(q, "スコア", "score", "おすすめ", "recommend", "改善"):
+        return [
+            ToolCall("c1", "get_health_score", {}),
+            ToolCall("c2", "get_recommendations", {}),
+        ]
     return [ToolCall("c1", "get_data_overview", {})]
 
 
@@ -120,6 +187,10 @@ def _summarize(results: list[tuple[str, dict[str, Any]]]) -> str:
         elif name == "get_recommendations":
             for r in d["recommendations"][:3]:
                 lines.append(f"- 提案({r['domain']}): {r['message']}")
+        elif name == "get_workout_logs":
+            rows = d["rows"]
+            high = sum(1 for r in rows if r["intensity"] == "high")
+            lines.append(f"- 運動{d['total']}回のうち、高強度は{high}回です(派生指標)。")
         elif name == "run_readonly_sql":
             lines.append(f"- SQL結果({d['row_count']}行, 列={d['columns']}):")
             for r in d["rows"][:5]:

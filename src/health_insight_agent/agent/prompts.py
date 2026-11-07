@@ -56,9 +56,24 @@ SQL_RULE = (
 )
 
 
+_MINIMAL_RULES = """You are an assistant that answers questions about a person's meal, workout and
+sleep logs using the provided tools. Today's date (JST) is {today}. Answer in {language}."""
+
+PROMPT_VARIANTS = ("full", "minimal")
+"""full: 数値・因果・件数明示などのルール付き(既定) / minimal: 評価の比較用の最小プロンプト。"""
+
+
 def build_system_prompt(
-    *, today: date, locale: Locale = Locale.JA, extra_rules: Sequence[str] = ()
+    *,
+    today: date,
+    locale: Locale = Locale.JA,
+    extra_rules: Sequence[str] = (),
+    variant: str = "full",
 ) -> str:
+    if variant == "minimal":
+        return _MINIMAL_RULES.format(today=today.isoformat(), language=_LANGUAGE[locale])
+    if variant != "full":
+        raise ValueError(f"unknown prompt variant: {variant}")
     text = _BASE_RULES.format(today=today.isoformat(), language=_LANGUAGE[locale])
     for i, rule in enumerate(extra_rules, start=11):
         text += f"\n{i}. {rule}"

@@ -48,6 +48,8 @@ class AgentConfig:
     max_tool_calls: int = 8
     """1質問あたりのツール呼び出し回数の上限(コスト・レイテンシ管理)。"""
     extra_rules: tuple[str, ...] = ()
+    prompt_variant: str = "full"
+    """評価で比較するためのプロンプト種別(agent/prompts.py)。"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,7 +103,10 @@ class HealthInsightAgent:
         """`history`は直近の(質問, 回答)テキストのみ。ツール結果は含めない(トークン節約)。"""
         started = time.perf_counter()
         system = build_system_prompt(
-            today=self._today(), locale=locale, extra_rules=self._config.extra_rules
+            today=self._today(),
+            locale=locale,
+            extra_rules=self._config.extra_rules,
+            variant=self._config.prompt_variant,
         )
         messages: list[Message] = []
         for q, a in history:

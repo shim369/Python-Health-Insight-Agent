@@ -22,7 +22,13 @@ from health_insight_agent.tools.builtin import build_default_registry
 from health_insight_agent.tools.executor import ToolExecutor
 
 
-def build_registry(settings: Settings, *, today: date | None = None) -> ToolRegistry:
+def build_registry(
+    settings: Settings,
+    *,
+    today: date | None = None,
+    enable_notes: bool = True,
+    enable_sql: bool | None = None,
+) -> ToolRegistry:
     # エージェントは読み取り専用。既存アプリのDBを読むときは READONLY_DATABASE_URL を使う
     # (書き込み権限の無い専用ユーザー)。無ければ開発DBを、トランザクションREAD ONLYで読む。
     url = settings.readonly_database_url or settings.database_url
@@ -43,8 +49,10 @@ def build_registry(settings: Settings, *, today: date | None = None) -> ToolRegi
     return build_default_registry(
         InsightDataService(uow_factory, clock=clock),
         LocalHealthInsightService(uow_factory),
-        notes,
-        ReadOnlySqlExecutor(url) if settings.sql_tool_enabled else None,
+        notes if enable_notes else None,
+        ReadOnlySqlExecutor(url)
+        if (settings.sql_tool_enabled if enable_sql is None else enable_sql)
+        else None,
     )
 
 
