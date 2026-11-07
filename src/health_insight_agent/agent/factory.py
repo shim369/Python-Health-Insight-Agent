@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from health_insight_agent.agent.loop import AgentConfig, HealthInsightAgent
-from health_insight_agent.agent.prompts import NOTES_RULE
+from health_insight_agent.agent.prompts import NOTES_RULE, SQL_RULE
 from health_insight_agent.agent.usage_log import JsonlSink, QuerySink, logging_sink
 from health_insight_agent.ai.factory import build_embedding_provider, build_llm_provider
 from health_insight_agent.ai.protocols import LLMProvider
@@ -13,6 +13,7 @@ from health_insight_agent.config import PROJECT_ROOT, Settings
 from health_insight_agent.local_time import local_today
 from health_insight_agent.rag.note_search import EmbeddingCache, NoteSearchService
 from health_insight_agent.rag.vector_store import NumpyVectorStore
+from health_insight_agent.readonly_sql.executor import ReadOnlySqlExecutor
 from health_insight_agent.repositories.sqlalchemy.factory import build_uow_factory
 from health_insight_agent.services.health_insight_service import LocalHealthInsightService
 from health_insight_agent.services.insight_data_service import InsightDataService
@@ -43,6 +44,7 @@ def build_registry(settings: Settings, *, today: date | None = None) -> ToolRegi
         InsightDataService(uow_factory, clock=clock),
         LocalHealthInsightService(uow_factory),
         notes,
+        ReadOnlySqlExecutor(url) if settings.sql_tool_enabled else None,
     )
 
 
@@ -70,7 +72,7 @@ def build_agent(
     return HealthInsightAgent(
         llm or build_llm_provider(settings.ai_provider, model=settings.gemini_model),
         build_tool_executor(settings, today=today),
-        config=config or AgentConfig(extra_rules=(NOTES_RULE,)),
+        config=config or AgentConfig(extra_rules=(NOTES_RULE, SQL_RULE)),
         today=(lambda: today) if today else local_today,
         sink=sink or JsonlSink(PROJECT_ROOT / "logs" / "agent_queries.jsonl"),
     )

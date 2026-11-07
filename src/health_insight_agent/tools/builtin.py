@@ -16,6 +16,7 @@ from health_insight_agent.domain.intensity import estimated_kcal, workout_intens
 from health_insight_agent.domain.models import MealLog
 from health_insight_agent.local_time import local_date_of
 from health_insight_agent.rag.note_search import NoteSearchService
+from health_insight_agent.readonly_sql.executor import ReadOnlySqlExecutor
 from health_insight_agent.services import stats
 from health_insight_agent.services.health_insight_service import HealthInsightPort
 from health_insight_agent.services.insight_data_service import (
@@ -128,6 +129,7 @@ def build_default_registry(
     data: InsightDataService,
     health: HealthInsightPort,
     notes: NoteSearchService | None = None,
+    sql: ReadOnlySqlExecutor | None = None,
 ) -> ToolRegistry:
     def overview(user_id: UUID, _: _NoArgs) -> ToolOutput:
         o = data.overview(user_id)
@@ -462,4 +464,8 @@ def build_default_registry(
                 search_notes,
             )
         )
+    if sql is not None:
+        from health_insight_agent.tools.sql_tool import build_sql_tool
+
+        reg.register(build_sql_tool(sql))
     return reg

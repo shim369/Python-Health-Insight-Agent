@@ -29,6 +29,7 @@ SETTINGS = Settings(
     ai_provider="fake",
     gemini_model=None,
     tool_transport="direct",
+    sql_tool_enabled=True,
     log_level="INFO",
 )
 

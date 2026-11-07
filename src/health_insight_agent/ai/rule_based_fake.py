@@ -43,6 +43,14 @@ def _period(question: str, today: date) -> dict[str, str]:
 def _plan(question: str, today: date) -> list[ToolCall]:
     q = question.lower()
     period = _period(question, today)
+    if _has(q, "平日", "休日", "曜日", "sql", "集計"):
+        sql = (
+            "SELECT CASE WHEN EXTRACT(ISODOW FROM wake_time AT TIME ZONE 'Asia/Tokyo') >= 6 "
+            "THEN 'weekend' ELSE 'weekday' END AS day_type, "
+            "ROUND(AVG(EXTRACT(EPOCH FROM (wake_time - bedtime)) / 60)::numeric, 1) "
+            "AS avg_sleep_min, COUNT(*) AS n FROM sleep_logs GROUP BY 1 ORDER BY 1"
+        )
+        return [ToolCall("c1", "run_readonly_sql", {"sql": sql})]
     if _has(q, "メモ", "日記", "振り返り", "書いて", "note", "diary"):
         return [ToolCall("c1", "search_notes", {"query": question, "top_k": 5})]
     if _has(q, "スコア", "score", "おすすめ", "recommend", "改善"):
@@ -112,6 +120,10 @@ def _summarize(results: list[tuple[str, dict[str, Any]]]) -> str:
         elif name == "get_recommendations":
             for r in d["recommendations"][:3]:
                 lines.append(f"- 提案({r['domain']}): {r['message']}")
+        elif name == "run_readonly_sql":
+            lines.append(f"- SQL結果({d['row_count']}行, 列={d['columns']}):")
+            for r in d["rows"][:5]:
+                lines.append(f"  - {r}")
         elif name == "search_notes":
             lines.append(
                 f"- 振り返りメモ{d['total_notes_indexed']}件から類似{len(d['hits'])}件を検索:"

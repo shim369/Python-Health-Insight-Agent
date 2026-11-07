@@ -49,6 +49,13 @@ NOTES_RULE = (
 )
 
 
+SQL_RULE = (
+    "Prefer the typed tools. Use run_readonly_sql only for custom aggregation they cannot do; "
+    "write one simple SELECT, never try to modify data, and if the guard rejects it, fix the "
+    "query once instead of repeating it."
+)
+
+
 def build_system_prompt(
     *, today: date, locale: Locale = Locale.JA, extra_rules: Sequence[str] = ()
 ) -> str:
