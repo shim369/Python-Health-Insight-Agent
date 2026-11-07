@@ -82,6 +82,10 @@ class HealthInsightAgent:
         self._today = today
         self._sink = sink
 
+    @property
+    def max_tool_calls(self) -> int:
+        return self._config.max_tool_calls
+
     def ask(
         self,
         user_id: UUID,
