@@ -8,11 +8,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import date, datetime, time
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import func, select
+from sqlalchemy.orm import InstrumentedAttribute, Session, selectinload
 
 from health_insight_agent.database import schema as orm
 from health_insight_agent.domain.models import (
@@ -24,7 +25,22 @@ from health_insight_agent.domain.models import (
     WeightLog,
     WorkoutLog,
 )
+from health_insight_agent.local_time import local_datetime
+from health_insight_agent.repositories.protocols import DataBounds
 from health_insight_agent.repositories.sqlalchemy import mappers as m
+
+
+def _bounds(
+    session: Session,
+    user_id: UUID,
+    user_col: InstrumentedAttribute[UUID],
+    time_col: InstrumentedAttribute[Any],
+) -> DataBounds:
+    """user_idで絞った件数と最小・最大(他ユーザーは含まない)。"""
+    row = session.execute(
+        select(func.count(), func.min(time_col), func.max(time_col)).where(user_col == user_id)
+    ).one()
+    return DataBounds(count=int(row[0]), first=row[1], last=row[2])
 
 
 class SqlAlchemyUserRepository:
@@ -42,6 +58,9 @@ class SqlAlchemyUserRepository:
 class SqlAlchemySleepLogRepository:
     def __init__(self, session: Session) -> None:
         self._s = session
+
+    def bounds(self, user_id: UUID) -> DataBounds:
+        return _bounds(self._s, user_id, orm.SleepLogORM.user_id, orm.SleepLogORM.wake_time)
 
     def add_many(self, logs: Sequence[SleepLog]) -> None:
         self._s.add_all([m.sleep_to_orm(x) for x in logs])
@@ -63,6 +82,9 @@ class SqlAlchemyMealLogRepository:
     def __init__(self, session: Session) -> None:
         self._s = session
 
+    def bounds(self, user_id: UUID) -> DataBounds:
+        return _bounds(self._s, user_id, orm.MealLogORM.user_id, orm.MealLogORM.consumed_at)
+
     def add_many(self, logs: Sequence[MealLog]) -> None:
         self._s.add_all([m.meal_to_orm(x) for x in logs])
 
@@ -82,6 +104,9 @@ class SqlAlchemyMealLogRepository:
 class SqlAlchemyWorkoutLogRepository:
     def __init__(self, session: Session) -> None:
         self._s = session
+
+    def bounds(self, user_id: UUID) -> DataBounds:
+        return _bounds(self._s, user_id, orm.WorkoutLogORM.user_id, orm.WorkoutLogORM.performed_at)
 
     def add_many(self, logs: Sequence[WorkoutLog]) -> None:
         self._s.add_all([m.workout_to_orm(x) for x in logs])
@@ -107,6 +132,9 @@ class SqlAlchemyHealthLogRepository:
     def __init__(self, session: Session) -> None:
         self._s = session
 
+    def bounds(self, user_id: UUID) -> DataBounds:
+        return _bounds(self._s, user_id, orm.HealthLogORM.user_id, orm.HealthLogORM.recorded_at)
+
     def add_many(self, logs: Sequence[HealthLog]) -> None:
         self._s.add_all([m.health_to_orm(x) for x in logs])
 
@@ -127,6 +155,9 @@ class SqlAlchemyWeightLogRepository:
     def __init__(self, session: Session) -> None:
         self._s = session
 
+    def bounds(self, user_id: UUID) -> DataBounds:
+        return _bounds(self._s, user_id, orm.WeightLogORM.user_id, orm.WeightLogORM.recorded_at)
+
     def add_many(self, logs: Sequence[WeightLog]) -> None:
         self._s.add_all([m.weight_to_orm(x) for x in logs])
 
@@ -146,6 +177,16 @@ class SqlAlchemyWeightLogRepository:
 class SqlAlchemyDailyJournalRepository:
     def __init__(self, session: Session) -> None:
         self._s = session
+
+    def bounds(self, user_id: UUID) -> DataBounds:
+        b = _bounds(self._s, user_id, orm.DailyJournalORM.user_id, orm.DailyJournalORM.journal_date)
+        # journal_dateは日付なので、他と形を揃えるためJST0時のdatetimeに変換する。
+        first, last = b.first, b.last
+        return DataBounds(
+            count=b.count,
+            first=local_datetime(first, time.min) if isinstance(first, date) else None,
+            last=local_datetime(last, time.min) if isinstance(last, date) else None,
+        )
 
     def add_many(self, journals: Sequence[DailyJournal]) -> None:
         self._s.add_all([m.journal_to_orm(x) for x in journals])

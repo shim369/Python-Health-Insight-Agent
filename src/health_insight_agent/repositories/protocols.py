@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, datetime
 from types import TracebackType
 from typing import Protocol
@@ -25,6 +26,15 @@ from health_insight_agent.domain.models import (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class DataBounds:
+    """あるユーザーのログの件数と最初・最後の日時(データ量の把握・「データ不足」の判断用)。"""
+
+    count: int
+    first: datetime | date | None
+    last: datetime | date | None
+
+
 class UserRepository(Protocol):
     def add(self, user: User) -> None: ...
 
@@ -32,6 +42,8 @@ class UserRepository(Protocol):
 
 
 class SleepLogRepository(Protocol):
+    def bounds(self, user_id: UUID) -> DataBounds: ...
+
     def add_many(self, logs: Sequence[SleepLog]) -> None: ...
 
     def list_between(self, user_id: UUID, start: datetime, end: datetime) -> list[SleepLog]:
@@ -40,12 +52,16 @@ class SleepLogRepository(Protocol):
 
 
 class MealLogRepository(Protocol):
+    def bounds(self, user_id: UUID) -> DataBounds: ...
+
     def add_many(self, logs: Sequence[MealLog]) -> None: ...
 
     def list_between(self, user_id: UUID, start: datetime, end: datetime) -> list[MealLog]: ...
 
 
 class WorkoutLogRepository(Protocol):
+    def bounds(self, user_id: UUID) -> DataBounds: ...
+
     def add_many(self, logs: Sequence[WorkoutLog]) -> None: ...
 
     def list_between(self, user_id: UUID, start: datetime, end: datetime) -> list[WorkoutLog]:
@@ -54,18 +70,24 @@ class WorkoutLogRepository(Protocol):
 
 
 class HealthLogRepository(Protocol):
+    def bounds(self, user_id: UUID) -> DataBounds: ...
+
     def add_many(self, logs: Sequence[HealthLog]) -> None: ...
 
     def list_between(self, user_id: UUID, start: datetime, end: datetime) -> list[HealthLog]: ...
 
 
 class WeightLogRepository(Protocol):
+    def bounds(self, user_id: UUID) -> DataBounds: ...
+
     def add_many(self, logs: Sequence[WeightLog]) -> None: ...
 
     def list_between(self, user_id: UUID, start: datetime, end: datetime) -> list[WeightLog]: ...
 
 
 class DailyJournalRepository(Protocol):
+    def bounds(self, user_id: UUID) -> DataBounds: ...
+
     def add_many(self, journals: Sequence[DailyJournal]) -> None: ...
 
     def list_between_dates(self, user_id: UUID, start: date, end: date) -> list[DailyJournal]:
