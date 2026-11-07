@@ -97,8 +97,10 @@ class SyntheticDataset:
     """全夜分の正解(睡眠ログが欠損した夜も含む)。"""
 
 
-def _uuid(rng: random.Random) -> UUID:
-    return UUID(int=rng.getrandbits(128), version=4)
+def _uuid(ids: random.Random) -> UUID:
+    """行IDの生成。IDはuser_id由来の別の乱数から作る。データの値はseedだけで決まるので、
+    同じseedなら別ユーザーでも同じ履歴になり、かつ主キー(全ユーザー共通)は衝突しない。"""
+    return UUID(int=ids.getrandbits(128), version=4)
 
 
 def _clamp(value: float, low: int, high: int) -> int:
@@ -112,11 +114,16 @@ def _at(d: date, hour: float, rng: random.Random, jitter_min: float = 0.0) -> da
 
 
 def _meal(
-    rng: random.Random, user_id: UUID, when: datetime, meal_type: MealType, kcal: float
+    rng: random.Random,
+    ids: random.Random,
+    user_id: UUID,
+    when: datetime,
+    meal_type: MealType,
+    kcal: float,
 ) -> MealLog:
     kcal = max(80.0, kcal)
     return MealLog(
-        meal_log_id=_uuid(rng),
+        meal_log_id=_uuid(ids),
         user_id=user_id,
         consumed_at=when,
         meal_type=meal_type,
@@ -128,7 +135,11 @@ def _meal(
 
 
 def _workout(
-    rng: random.Random, user_id: UUID, when: datetime, intensity: WorkoutIntensity
+    rng: random.Random,
+    ids: random.Random,
+    user_id: UUID,
+    when: datetime,
+    intensity: WorkoutIntensity,
 ) -> WorkoutLog:
     low, high = _KCAL_BANDS[intensity]
     kcal = round(rng.uniform(low, high))
@@ -159,7 +170,7 @@ def _workout(
                 )
             )
     workout = WorkoutLog(
-        workout_log_id=_uuid(rng),
+        workout_log_id=_uuid(ids),
         user_id=user_id,
         performed_at=when,
         exercises=exercises,
@@ -179,7 +190,12 @@ def _quality(rng: random.Random, duration_min: int) -> SleepQuality:
 
 
 def generate_dataset(
-    user_id: UUID, *, end_date: date, days: int = 90, seed: int = 42
+    user_id: UUID,
+    *,
+    end_date: date,
+    days: int = 90,
+    seed: int = 42,
+    email: str = "demo@example.com",
 ) -> SyntheticDataset:
     """`end_date`を最終日とする`days`日分(睡眠は最初の1日分を除く)を生成する。
 
@@ -187,11 +203,12 @@ def generate_dataset(
     (要因が見えない睡眠ログを作ると、パターン検証が不公平になるため)。
     """
     rng = random.Random(seed)
+    ids = random.Random(f"ids:{user_id}")
     start = end_date - timedelta(days=days - 1)
     ds = SyntheticDataset(
         user=User(
             user_id=user_id,
-            email="demo@example.com",  # 架空のアドレス(実在の個人情報ではない)
+            email=email,  # 既定は架空のアドレス(実在の個人情報ではない)
             display_name="Demo User",
             created_at=local_datetime(start, time.min),
             locale=Locale.JA,
@@ -206,20 +223,28 @@ def generate_dataset(
 
         # --- 食事(朝・昼は固定的、夕食は30%が遅い。夜食が少しある) ---
         meals = [
-            _meal(rng, user_id, _at(day, 7.5, rng, 25), MealType.BREAKFAST, rng.gauss(420, 80)),
-            _meal(rng, user_id, _at(day, 12.5, rng, 25), MealType.LUNCH, rng.gauss(700, 110)),
+            _meal(
+                rng, ids, user_id, _at(day, 7.5, rng, 25), MealType.BREAKFAST, rng.gauss(420, 80)
+            ),
+            _meal(rng, ids, user_id, _at(day, 12.5, rng, 25), MealType.LUNCH, rng.gauss(700, 110)),
         ]
         dinner_hour = rng.uniform(21.25, 22.75) if rng.random() < 0.30 else rng.uniform(18.5, 20.0)
         meals.append(
-            _meal(rng, user_id, _at(day, dinner_hour, rng), MealType.DINNER, rng.gauss(720, 140))
+            _meal(
+                rng, ids, user_id, _at(day, dinner_hour, rng), MealType.DINNER, rng.gauss(720, 140)
+            )
         )
         if rng.random() < 0.25:
             meals.append(
-                _meal(rng, user_id, _at(day, 15.0, rng, 20), MealType.SNACK, rng.gauss(160, 40))
+                _meal(
+                    rng, ids, user_id, _at(day, 15.0, rng, 20), MealType.SNACK, rng.gauss(160, 40)
+                )
             )
         if rng.random() < 0.08:
             meals.append(
-                _meal(rng, user_id, _at(day, rng.uniform(22.5, 23.2), rng), MealType.SNACK, 180)
+                _meal(
+                    rng, ids, user_id, _at(day, rng.uniform(22.5, 23.2), rng), MealType.SNACK, 180
+                )
             )
         ds.meal_logs.extend(meals)
 
@@ -237,7 +262,7 @@ def generate_dataset(
                 (WorkoutIntensity.LOW, WorkoutIntensity.MODERATE, WorkoutIntensity.HIGH),
                 weights=weights,
             )[0]
-            ds.workout_logs.append(_workout(rng, user_id, when, intensity))
+            ds.workout_logs.append(_workout(rng, ids, user_id, when, intensity))
             evening_high = (
                 slot == "night" and intensity == WorkoutIntensity.HIGH
             )  # 20時以降の高強度
@@ -247,7 +272,7 @@ def generate_dataset(
         if rng.random() < 0.9:
             ds.weight_logs.append(
                 WeightLog(
-                    weight_log_id=_uuid(rng),
+                    weight_log_id=_uuid(ids),
                     user_id=user_id,
                     recorded_at=_at(day, 7.2, rng, 5),
                     weight_kg=round(weight, 1),
@@ -276,7 +301,7 @@ def generate_dataset(
             if rng.random() > 0.03:
                 ds.sleep_logs.append(
                     SleepLog(
-                        sleep_log_id=_uuid(rng),
+                        sleep_log_id=_uuid(ids),
                         user_id=user_id,
                         bedtime=bedtime,
                         wake_time=bedtime + timedelta(minutes=round(duration)),
@@ -300,7 +325,7 @@ def generate_dataset(
             stress = _clamp((3.0 if weekend else 3.4) + rng.gauss(0, 0.8), 1, 5)
             ds.health_logs.append(
                 HealthLog(
-                    health_log_id=_uuid(rng),
+                    health_log_id=_uuid(ids),
                     user_id=user_id,
                     recorded_at=_at(day, 21.0, rng, 20),
                     condition_score=_clamp((morning + evening + mental + (6 - fatigue)) / 4, 1, 5),
@@ -324,7 +349,7 @@ def generate_dataset(
                 sentences.append(rng.choice(_SHORT_SLEEP_NOTES))
             ds.daily_journals.append(
                 DailyJournal(
-                    daily_journal_id=_uuid(rng),
+                    daily_journal_id=_uuid(ids),
                     user_id=user_id,
                     journal_date=day,
                     wake_target_time=time(6, 30),
