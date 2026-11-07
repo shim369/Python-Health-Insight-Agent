@@ -63,6 +63,15 @@ PROMPT_VARIANTS = ("full", "minimal")
 """full: 数値・因果・件数明示などのルール付き(既定) / minimal: 評価の比較用の最小プロンプト。"""
 
 
+MODEL_RULE = (
+    "predict_sleep_duration returns a REFERENCE value from a small model. When you report it, "
+    "always say it is a reference value (参考値), and state the model's MAE and its improvement "
+    "vs the baseline from the tool result. If model_used is false, say clearly that no model was "
+    "used (and why), and report only the fallback statistics. Never present a prediction as "
+    "certain or medical. explain_sleep_factors importances are not causal effects."
+)
+
+
 def build_system_prompt(
     *,
     today: date,

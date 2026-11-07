@@ -36,8 +36,15 @@ class Settings:
     gemini_model: str | None
     tool_transport: str
     sql_tool_enabled: bool
+    model_tool_enabled: bool
+    ml_tracking_enabled: bool
     """direct=関数を直接呼ぶ / mcp=MCPサーバー(子プロセス)経由で呼ぶ。"""
     log_level: str
+
+
+def _on(name: str) -> bool:
+    """機能スイッチ。既定は有効で、off/0/false のときだけ無効。"""
+    return os.environ.get(name, "on").lower() not in ("off", "0", "false")
 
 
 def load_settings() -> Settings:
@@ -54,7 +61,10 @@ def load_settings() -> Settings:
         ai_provider=os.environ.get("AI_PROVIDER", "gemini").lower(),
         gemini_model=os.environ.get("GEMINI_MODEL") or None,
         tool_transport=os.environ.get("TOOL_TRANSPORT", "direct").lower(),
-        sql_tool_enabled=os.environ.get("SQL_TOOL", "on").lower() not in ("off", "0", "false"),
+        sql_tool_enabled=_on("SQL_TOOL"),
+        model_tool_enabled=_on("ML_TOOL"),
+        ml_tracking_enabled=os.environ.get("ML_TRACKING", "on").lower()
+        not in ("off", "0", "false"),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
     )
 

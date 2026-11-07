@@ -15,6 +15,7 @@ from pydantic import Field
 from health_insight_agent.domain.intensity import estimated_kcal, workout_intensity
 from health_insight_agent.domain.models import MealLog
 from health_insight_agent.local_time import local_date_of
+from health_insight_agent.ml.service import SleepModelService
 from health_insight_agent.rag.note_search import NoteSearchService
 from health_insight_agent.readonly_sql.executor import ReadOnlySqlExecutor
 from health_insight_agent.services import stats
@@ -130,6 +131,7 @@ def build_default_registry(
     health: HealthInsightPort,
     notes: NoteSearchService | None = None,
     sql: ReadOnlySqlExecutor | None = None,
+    model: SleepModelService | None = None,
 ) -> ToolRegistry:
     def overview(user_id: UUID, _: _NoArgs) -> ToolOutput:
         o = data.overview(user_id)
@@ -469,4 +471,9 @@ def build_default_registry(
         from health_insight_agent.tools.sql_tool import build_sql_tool
 
         reg.register(build_sql_tool(sql))
+    if model is not None:
+        from health_insight_agent.tools.model_tools import build_model_tools
+
+        for t in build_model_tools(model):
+            reg.register(t)
     return reg

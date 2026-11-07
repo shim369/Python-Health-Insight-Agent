@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import os
 from datetime import date
+from pathlib import Path
 
 from health_insight_agent.agent.loop import AgentConfig, HealthInsightAgent
-from health_insight_agent.agent.prompts import NOTES_RULE, SQL_RULE
+from health_insight_agent.agent.prompts import MODEL_RULE, NOTES_RULE, SQL_RULE
 from health_insight_agent.agent.usage_log import JsonlSink, QuerySink, logging_sink
 from health_insight_agent.ai.factory import build_embedding_provider, build_llm_provider
 from health_insight_agent.ai.protocols import LLMProvider
 from health_insight_agent.config import PROJECT_ROOT, Settings
 from health_insight_agent.local_time import local_today
+from health_insight_agent.ml.model_registry import ModelRegistry
+from health_insight_agent.ml.service import SleepModelService
+from health_insight_agent.ml.tracking import MlflowTracker, NullTracker
 from health_insight_agent.rag.note_search import EmbeddingCache, NoteSearchService
 from health_insight_agent.rag.vector_store import NumpyVectorStore
 from health_insight_agent.readonly_sql.executor import ReadOnlySqlExecutor
@@ -28,6 +33,7 @@ def build_registry(
     today: date | None = None,
     enable_notes: bool = True,
     enable_sql: bool | None = None,
+    enable_model: bool | None = None,
 ) -> ToolRegistry:
     # エージェントは読み取り専用。既存アプリのDBを読むときは READONLY_DATABASE_URL を使う
     # (書き込み権限の無い専用ユーザー)。無ければ開発DBを、トランザクションREAD ONLYで読む。
@@ -46,13 +52,28 @@ def build_registry(
         ),
         clock=clock,
     )
+    data = InsightDataService(uow_factory, clock=clock)
+    use_model = settings.model_tool_enabled if enable_model is None else enable_model
+    model = (
+        SleepModelService(
+            data,
+            # ML_ARTIFACT_DIR: 採用判断JSONの保存先(テストで一時ディレクトリに向けるため)
+            ModelRegistry(Path(os.environ.get("ML_ARTIFACT_DIR") or PROJECT_ROOT / "ml_artifacts")),
+            tracker=MlflowTracker(PROJECT_ROOT / "mlruns")
+            if settings.ml_tracking_enabled
+            else NullTracker(),
+        )
+        if use_model
+        else None
+    )
     return build_default_registry(
-        InsightDataService(uow_factory, clock=clock),
+        data,
         LocalHealthInsightService(uow_factory),
         notes if enable_notes else None,
         ReadOnlySqlExecutor(url)
         if (settings.sql_tool_enabled if enable_sql is None else enable_sql)
         else None,
+        model,
     )
 
 
@@ -80,7 +101,7 @@ def build_agent(
     return HealthInsightAgent(
         llm or build_llm_provider(settings.ai_provider, model=settings.gemini_model),
         build_tool_executor(settings, today=today),
-        config=config or AgentConfig(extra_rules=(NOTES_RULE, SQL_RULE)),
+        config=config or AgentConfig(extra_rules=(NOTES_RULE, SQL_RULE, MODEL_RULE)),
         today=(lambda: today) if today else local_today,
         sink=sink or JsonlSink(PROJECT_ROOT / "logs" / "agent_queries.jsonl"),
     )

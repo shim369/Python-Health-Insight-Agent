@@ -30,6 +30,8 @@ SETTINGS = Settings(
     gemini_model=None,
     tool_transport="direct",
     sql_tool_enabled=True,
+    model_tool_enabled=True,
+    ml_tracking_enabled=False,
     log_level="INFO",
 )
 

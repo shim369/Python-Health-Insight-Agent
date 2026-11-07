@@ -10,12 +10,16 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import date, time
 from uuid import UUID, uuid4
 
 os.environ["APP_ENV"] = "test"
+# テストがリポジトリ直下に学習記録(mlruns/ml_artifacts)を書き散らさないようにする
+os.environ["ML_TRACKING"] = "off"
+os.environ["ML_ARTIFACT_DIR"] = tempfile.mkdtemp(prefix="hia-ml-")
 
 
 import pytest
