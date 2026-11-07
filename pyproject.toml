@@ -6,9 +6,12 @@ readme = "README.md"
 requires-python = ">=3.15"
 dependencies = [
     "alembic>=1.20.1",
+    "google-genai>=3.0.0",
+    "numpy>=2.5.4",
     "psycopg[binary]>=3.3.8",
     "pydantic>=2.14.3",
     "python-dotenv>=1.2.4",
+    "scipy>=1.18.1",
     "sqlalchemy>=2.1.8",
 ]
 
@@ -35,6 +38,10 @@ indent-style = "space"
 python_version = "3.14"
 strict = true
 plugins = []
+
+[[tool.mypy.overrides]]
+module = ["scipy.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
