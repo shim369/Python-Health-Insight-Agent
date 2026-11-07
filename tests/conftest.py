@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
-from datetime import date
+from dataclasses import replace
+from datetime import date, time
 from uuid import UUID, uuid4
 
 os.environ["APP_ENV"] = "test"
 
-from datetime import time
 
 import pytest
 from alembic import command
@@ -87,3 +87,41 @@ def make_user(session: Session, *, email: str | None = None) -> UUID:
     )
     session.flush()
     return uid
+
+
+@pytest.fixture(scope="module")
+def seeded(migrated_database: str) -> Iterator[tuple[object, UUID, UUID]]:
+    """実際にcommitした合成データ(2ユーザー)。終了時に削除する(テスト専用DBなので安全)。
+
+    戻り値: (uow_factory, user_id, other_user_id)。other_user_idは少量の別データを持ち、
+    ユーザー分離の確認に使う。
+    """
+    from health_insight_agent.repositories.sqlalchemy.factory import build_uow_factory
+    from health_insight_agent.synthetic.generator import generate_dataset
+
+    factory = build_uow_factory(migrated_database)
+    ids: list[UUID] = []
+    for seed, days in ((42, 90), (7, 20)):
+        uid = uuid4()
+        ids.append(uid)
+        ds = generate_dataset(uid, end_date=FIXED_END_DATE, days=days, seed=seed)
+        with factory() as uow:
+            uow.users.add(replace(ds.user, email=f"{uid}@example.com"))
+            uow.commit()
+            uow.sleep_logs.add_many(ds.sleep_logs)
+            uow.meal_logs.add_many(ds.meal_logs)
+            uow.workout_logs.add_many(ds.workout_logs)
+            uow.health_logs.add_many(ds.health_logs)
+            uow.weight_logs.add_many(ds.weight_logs)
+            uow.daily_journals.add_many(ds.daily_journals)
+            uow.commit()
+    yield factory, ids[0], ids[1]
+    from sqlalchemy import delete
+
+    from health_insight_agent.database import schema as orm
+
+    for uid in ids:
+        with factory() as uow:
+            uow.purge_user_data(uid)
+            uow._session.execute(delete(orm.UserORM).where(orm.UserORM.id == uid))  # type: ignore[union-attr]
+            uow.commit()
