@@ -33,6 +33,7 @@ class Settings:
     demo_user_id: UUID
     app_env: str
     ai_provider: str
+    gemini_model: str | None
     log_level: str
 
 
@@ -48,6 +49,7 @@ def load_settings() -> Settings:
         demo_user_id=UUID(os.environ.get("DEMO_USER_ID", str(DEFAULT_DEMO_USER_ID))),
         app_env=os.environ.get("APP_ENV", "dev"),
         ai_provider=os.environ.get("AI_PROVIDER", "gemini").lower(),
+        gemini_model=os.environ.get("GEMINI_MODEL") or None,
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
     )
 
