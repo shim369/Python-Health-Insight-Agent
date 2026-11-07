@@ -30,6 +30,7 @@
 | **MCP** | 全ツールをMCPサーバーとして公開。設定で「直接呼ぶ/MCP経由」を切替(結果が同一であることをテスト) | [ADR 0004](docs/adr/0004-tool-transport-direct-or-mcp.md) |
 | **RAG** | 振り返りメモを埋め込み検索。`VectorStore` はProtocolで、後からpgvectorへ差し替え可能 | [ADR 0006](docs/adr/0006-rag-vectorstore-protocol.md) |
 | **自作モデルとの併用** | 翌日の睡眠時間をLightGBMで予測。**Baseline比10%以上改善・過学習差20%以内**のときだけ採用、データ不足なら統計にフォールバック | [自作モデル](#自作モデル睡眠時間の予測)、[ADR 0009](docs/adr/0009-why-llm-plus-custom-model.md)、[0010](docs/adr/0010-sleep-model-adoption-and-fallback.md) |
+| **読みやすい結果** | 統計はグラフの下に平易な所見カード(強さのメーター・件数・信頼度)で表示。睡眠は時間で表示。画面・回答・グラフ・ツールの文章を日本語/英語で切替 | [ADR 0011](docs/adr/0011-i18n-and-finding-cards.md) |
 | **評価** | 正解付き25問(仕込みパターンの発見・「ない」と答える・事実・RAG・SQL・診断を断る・自作モデルの利用)。LLM採点なしの決定的な自動採点 | [評価結果](docs/evaluation-results.md) |
 | **コスト管理** | 1質問ごとにトークン・ツール回数・所要時間をログ。ツール回数の上限、レート制限、埋め込みキャッシュ、プロンプトに直近履歴だけ | `logs/`、`AgentConfig` |
 | **既存アプリ統合** | 既存の `Python-Smart-Health-Intelligence-Platform` と同じスキーマ・命名・RetryPolicy・Provider切替。既存アプリは変更しない | [ADR 0005](docs/adr/0005-existing-app-integration.md) |
@@ -86,6 +87,10 @@ uv run uvicorn health_insight_agent.api.app:create_app --factory --port 8000
 cd frontend && npm ci && npm run dev      # http://localhost:5173
 ```
 
+Web UIの機能: サジェスト質問、**グラフ**付きの回答、その下の**所見カード**、折りたたみの**「使ったツールと結果」**
+(引数・件数・生の結果)、回答ごとの使用量チップ(モデル・トークン・ツール回数・所要時間)、予測値の**「モデルによる参考値」**
+ラベル、日本語/英語の切替、ライト/ダークテーマ、レスポンシブ対応。
+
 **MCPサーバー**(他のMCPクライアントからも使える。ユーザーは起動時に束縛):
 
 ```bash
@@ -100,6 +105,39 @@ cd frontend && npm run typecheck && npm test
 ```
 
 テストは必ず `_test` で終わる専用DBにだけ接続します(違えば中断)。`.env`(実DB)は読みません。
+
+GitHub Actions(`.github/workflows/ci.yml`)は、Ruff・`ruff format --check`・mypy・Alembic・pytest(Postgres 16サービス)と、
+キー無しベースラインの正答率が85%を下回ると失敗する**オフライン評価**を実行します。別ジョブでフロントの型チェック・テスト・ビルドも行います。
+
+## 設定
+
+設定はすべて環境変数です(`.env.example` を `.env` にコピー。`.env` はgit管理外)。
+
+| 変数 | 既定値 | 意味 |
+|---|---|---|
+| `DATABASE_URL` | ローカルのDocker Postgres(5433番) | DB。エージェントはREAD ONLYトランザクションで読むだけ |
+| `READONLY_DATABASE_URL` | 空 | **任意**。*書き込み権限の無い*ユーザーのURL。空なら `DATABASE_URL` を使う。既存アプリのDB(Neon等)を読むときや、SQLツールのDBロール防御をローカルで有効にしたいときに設定(下記) |
+| `DEMO_USER_ID` | 固定UUID | 認証の代用(ADR 0005) |
+| `AI_PROVIDER` | `.env.example` では `fake`(未設定なら `gemini`) | `fake`=キー不要のルールベース、`gemini`=本物のGemini |
+| `GEMINI_API_KEY` | – | `gemini` のとき必須 |
+| `GEMINI_MODEL` / `GEMINI_EMBEDDING_MODEL` | `gemini-3.6-flash` / `gemini-embedding-2` | モデル。コード変更なしで切替 |
+| `TOOL_TRANSPORT` | `direct` | `direct`=同一プロセスで呼ぶ、`mcp`=MCPサーバー(子プロセス)経由 |
+| `SQL_TOOL`, `ML_TOOL`, `ML_TRACKING` | `on` | 機能スイッチ: ガード付きSQL、睡眠モデルのツール、MLflow記録 |
+| `ML_ARTIFACT_DIR` | `ml_artifacts/` | 採用判断JSONの保存先 |
+| `CHAT_RATE_LIMIT_PER_MIN` | `20` | APIのクライアントごとのリクエスト上限 |
+| `CORS_ORIGINS` | `http://localhost:5173,…` | 開発用フロントに許可するオリジン |
+| `MCP_USER_ID`, `MCP_TODAY` | デモユーザー / 今日 | MCPサーバーのみ: 束縛するユーザー、評価用の固定の「今日」 |
+| `LOG_LEVEL` | `INFO` | ログ |
+
+**読み取り専用のDBユーザーの作り方**(任意。`READONLY_DATABASE_URL` 用)。マイグレーション `0002` が、ログ表だけにSELECTできる
+グループロール `health_insight_reader`(`users` は**不可**)を作ります。ここにログインユーザーを追加します:
+
+```bash
+READONLY_PASSWORD='パスワード' uv run python -m health_insight_agent.database.readonly_role --user agent_ro
+# 表示: READONLY_DATABASE_URL=postgresql+psycopg://agent_ro:<password>@localhost:5433/health_insight
+```
+
+表示されたURL(`<password>` は実際のパスワードに置換)を `.env` に入れます。このユーザーは書き込みも、メールアドレスの閲覧もできません。
 
 ## 実キー(Gemini)で試す
 
@@ -237,7 +275,7 @@ src/health_insight_agent/
   api/           # FastAPI
   synthetic/     # 合成データ生成(既知パターン)
   evaluation/    # 質問セット・採点・設定比較
-frontend/        # React + Vite + TypeScript
+frontend/        # React + Vite + TypeScript(SCSS)
 docs/            # requirements.md・adr/・evaluation-results.md
 ml_artifacts/ mlruns/   # 採用判断JSON・MLflow(生成物。git管理外)
 ```

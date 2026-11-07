@@ -41,6 +41,7 @@ language they were asked in.
 | **MCP** | All tools are exposed as an MCP server; a setting switches between direct calls and MCP (tests assert identical results) | [ADR 0004](docs/adr/0004-tool-transport-direct-or-mcp.md) |
 | **RAG** | Semantic search over reflection notes. `VectorStore` is a Protocol, so pgvector can replace the NumPy store later | [ADR 0006](docs/adr/0006-rag-vectorstore-protocol.md) |
 | **LLM + custom model** | Next-day sleep is predicted with LightGBM. Adopted only if it beats the baseline by **≥10%** with a **train/validation gap ≤20%**; otherwise it falls back to statistics | [Custom model](#custom-model-sleep-duration-prediction), [ADR 0009](docs/adr/0009-why-llm-plus-custom-model.md), [0010](docs/adr/0010-sleep-model-adoption-and-fallback.md) |
+| **Readable results** | Statistics become plain-language finding cards under the chart (strength meter, records, reliability); sleep is shown in hours; UI, answers, charts and tool texts switch between English and Japanese | [ADR 0011](docs/adr/0011-i18n-and-finding-cards.md) |
 | **Evaluation** | 25 ground-truth questions (finding planted patterns, saying "there is none", facts, RAG, SQL, refusing to diagnose, custom model). Deterministic scoring, no LLM judge | [Results](docs/evaluation-results.md) |
 | **Cost control** | Per-question log of tokens / tool calls / latency; tool-call cap; rate limit; embedding cache; only recent history in the prompt | `logs/`, `AgentConfig` |
 | **Integration** | Same schema, naming, RetryPolicy and provider switch as the existing app `Python-Smart-Health-Intelligence-Platform`, which is left untouched | [ADR 0005](docs/adr/0005-existing-app-integration.md) |
@@ -96,6 +97,11 @@ uv run uvicorn health_insight_agent.api.app:create_app --factory --port 8000
 cd frontend && npm ci && npm run dev      # http://localhost:5173
 ```
 
+The web UI offers: suggested questions, the answer with **charts**, **finding cards** under them, a
+collapsible **"Tools used and results"** panel (arguments, record counts, raw results), per-answer usage chips
+(model, tokens, tool calls, latency), the **"Model-based reference value"** label on predictions, an English /
+Japanese toggle, light and dark themes, and a responsive layout.
+
 **MCP server** (usable from other MCP clients; the user is bound at startup):
 
 ```bash
@@ -111,6 +117,40 @@ cd frontend && npm run typecheck && npm test
 
 Tests only ever connect to a dedicated database whose name ends in `_test` (otherwise the run aborts)
 and never read `.env` (your real database).
+
+GitHub Actions (`.github/workflows/ci.yml`) runs Ruff, `ruff format --check`, mypy, the Alembic migrations,
+pytest (against a Postgres 16 service) and an **offline evaluation** that fails if the keyless baseline drops
+below 85% accuracy; a second job type-checks, tests and builds the frontend.
+
+## Configuration
+
+Everything is configured through environment variables (copy `.env.example` to `.env`; `.env` is git-ignored).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DATABASE_URL` | local Docker Postgres (port 5433) | Database. The agent only ever reads, inside READ ONLY transactions |
+| `READONLY_DATABASE_URL` | empty | **Optional.** A user *without write permission*. Empty: the agent uses `DATABASE_URL`. Set it to read the existing app's database (e.g. Neon) or to enable the DB-role defence of the SQL tool locally (below) |
+| `DEMO_USER_ID` | fixed UUID | Stand-in for authentication (ADR 0005) |
+| `AI_PROVIDER` | `fake` in `.env.example` (`gemini` if unset) | `fake` = keyless rule-based demo LLM, `gemini` = real Gemini |
+| `GEMINI_API_KEY` | – | Needed for `gemini` |
+| `GEMINI_MODEL` / `GEMINI_EMBEDDING_MODEL` | `gemini-3.6-flash` / `gemini-embedding-2` | Models; change without code edits |
+| `TOOL_TRANSPORT` | `direct` | `direct` calls tools in-process, `mcp` goes through an MCP server subprocess |
+| `SQL_TOOL`, `ML_TOOL`, `ML_TRACKING` | `on` | Feature switches: guarded SQL tool, sleep-model tools, MLflow logging |
+| `ML_ARTIFACT_DIR` | `ml_artifacts/` | Where adoption-decision JSON is written |
+| `CHAT_RATE_LIMIT_PER_MIN` | `20` | Per-client request limit of the API |
+| `CORS_ORIGINS` | `http://localhost:5173,…` | Allowed browser origins for the dev frontend |
+| `MCP_USER_ID`, `MCP_TODAY` | demo user / today | MCP server only: the bound user, and a fixed "today" for evaluation |
+| `LOG_LEVEL` | `INFO` | Logging |
+
+**Creating a read-only database user** (optional, for `READONLY_DATABASE_URL`). Migration `0002` creates the
+group role `health_insight_reader` (SELECT on the log tables only, **not** on `users`). Add a login user to it:
+
+```bash
+READONLY_PASSWORD='choose-a-password' uv run python -m health_insight_agent.database.readonly_role --user agent_ro
+# prints: READONLY_DATABASE_URL=postgresql+psycopg://agent_ro:<password>@localhost:5433/health_insight
+```
+
+Put that URL (with your real password) into `.env`. The role cannot write and cannot read e-mail addresses.
 
 ## Trying it with a real Gemini key
 
