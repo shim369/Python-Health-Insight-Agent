@@ -196,3 +196,18 @@ def test_model_tools_are_absent_when_not_configured(seeded: Any) -> None:
     factory = seeded[0]
     reg = build_default_registry(InsightDataService(factory), LocalHealthInsightService(factory))
     assert "predict_sleep_duration" not in reg.names and "explain_sleep_factors" not in reg.names
+
+
+def test_model_tool_texts_follow_the_requested_language(tools: Any) -> None:
+    import re
+
+    reg, uid, other = tools
+    jp = re.compile(r"[぀-ヿ一-鿿]")
+    args = {"last_meal_hour": 22.5, "bedtime_hour": 24}
+    for user in (uid, other):  # 採用された場合と、データ不足でフォールバックした場合の両方
+        en = reg.execute(user, "predict_sleep_duration", args, "en")
+        ja = reg.execute(user, "predict_sleep_duration", args, "ja")
+        assert not jp.search(str(en.content)), en.content
+        assert jp.search(ja.content["data"]["model"]["reason"])
+        factors = reg.execute(user, "explain_sleep_factors", {}, "en")
+        assert not jp.search(str(factors.content)), factors.content

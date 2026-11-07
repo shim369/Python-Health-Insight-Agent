@@ -22,6 +22,24 @@ class AnalysisResult:
     findings: list[str] = field(default_factory=list)
 
 
+def _t(locale: str, ja: str, en: str) -> str:
+    return en if locale == "en" else ja
+
+
+def _not_enough(locale: str, ja_noun: str, en_noun: str) -> AnalysisResult:
+    """記録が無いときは、中立の50点で「評価できない」と伝える。"""
+    return AnalysisResult(
+        score=50.0,
+        findings=[
+            _t(
+                locale,
+                f"{ja_noun}記録が不足しているため評価できません",
+                f"Not enough {en_noun} records to evaluate",
+            )
+        ],
+    )
+
+
 def clamp_score(score: float) -> float:
     return max(0.0, min(100.0, score))
 
@@ -126,9 +144,18 @@ def _range_penalty(value: float, low: float, high: float) -> float:
     return 0.0
 
 
-def analyze_nutrition(f: NutritionFeatures) -> AnalysisResult:
+def analyze_nutrition(f: NutritionFeatures, locale: str = "ja") -> AnalysisResult:
     if f.total_calories == 0:
-        return AnalysisResult(score=50.0, findings=["食事記録が不足しているため評価できません"])
+        return AnalysisResult(
+            score=50.0,
+            findings=[
+                _t(
+                    locale,
+                    "食事記録が不足しているため評価できません",
+                    "Not enough meal records to evaluate",
+                )
+            ],
+        )
     penalty = (
         _range_penalty(f.protein_ratio, 0.13, 0.20)
         + _range_penalty(f.fat_ratio, 0.20, 0.30)
@@ -136,54 +163,122 @@ def analyze_nutrition(f: NutritionFeatures) -> AnalysisResult:
     )
     findings = []
     if f.protein_ratio < 0.13:
-        findings.append("タンパク質の摂取割合が目安より低めです")
+        findings.append(
+            _t(
+                locale,
+                "タンパク質の摂取割合が目安より低めです",
+                "Protein share is below the guideline range",
+            )
+        )
     if f.fat_ratio > 0.30:
-        findings.append("脂質の摂取割合が目安より高めです")
+        findings.append(
+            _t(locale, "脂質の摂取割合が目安より高めです", "Fat share is above the guideline range")
+        )
     if not findings:
-        findings.append("PFCバランスは目安の範囲内です")
+        findings.append(
+            _t(locale, "PFCバランスは目安の範囲内です", "PFC balance is within the guideline range")
+        )
     return AnalysisResult(score=clamp_score(100.0 - penalty * 300.0), findings=findings)
 
 
-def analyze_weight(f: WeightFeatures) -> AnalysisResult:
+def analyze_weight(f: WeightFeatures, locale: str = "ja") -> AnalysisResult:
     if f.change_rate is None:
-        return AnalysisResult(score=50.0, findings=["体重記録が不足しているため評価できません"])
+        return AnalysisResult(
+            score=50.0,
+            findings=[
+                _t(
+                    locale,
+                    "体重記録が不足しているため評価できません",
+                    "Not enough weight records to evaluate",
+                )
+            ],
+        )
     excess = max(0.0, abs(f.change_rate) - 0.01)  # 週1%以内を「安定」とする暫定値
     if excess > 0:
-        direction = "増加" if f.change_rate > 0 else "減少"
-        findings = [f"体重が急激に{direction}しています(変化率 {f.change_rate:+.1%})"]
+        up = f.change_rate > 0
+        findings = [
+            _t(
+                locale,
+                f"体重が急激に{'増加' if up else '減少'}しています(変化率 {f.change_rate:+.1%})",
+                f"Weight is {'increasing' if up else 'decreasing'} rapidly "
+                f"(change rate {f.change_rate:+.1%})",
+            )
+        ]
     else:
-        findings = ["体重は安定して推移しています"]
+        findings = [_t(locale, "体重は安定して推移しています", "Weight is stable")]
     return AnalysisResult(score=clamp_score(100.0 - excess * 1000.0), findings=findings)
 
 
-def analyze_sleep(f: SleepFeatures) -> AnalysisResult:
+def analyze_sleep(f: SleepFeatures, locale: str = "ja") -> AnalysisResult:
     if f.average_duration_minutes is None:
-        return AnalysisResult(score=50.0, findings=["睡眠記録が不足しているため評価できません"])
+        return AnalysisResult(
+            score=50.0,
+            findings=[
+                _t(
+                    locale,
+                    "睡眠記録が不足しているため評価できません",
+                    "Not enough sleep records to evaluate",
+                )
+            ],
+        )
     low, high = 360, 540  # 推奨レンジ(6〜9時間)
     avg = f.average_duration_minutes
     duration_penalty = (low - avg) * 0.3 if avg < low else (avg - high) * 0.3 if avg > high else 0.0
     score = clamp_score(100.0 - duration_penalty - f.insufficient_sleep_days * 5.0)
     findings = []
     if duration_penalty > 0:
-        findings.append(f"平均睡眠時間が目安から外れています({avg:.0f}分)")
+        findings.append(
+            _t(
+                locale,
+                f"平均睡眠時間が目安から外れています({avg / 60:.1f}時間)",
+                f"Average sleep ({avg / 60:.1f} h) is outside the guideline range",
+            )
+        )
     if f.insufficient_sleep_days > 0:
-        findings.append(f"睡眠不足の日が{f.insufficient_sleep_days}日あります")
+        findings.append(
+            _t(
+                locale,
+                f"睡眠不足の日が{f.insufficient_sleep_days}日あります",
+                f"{f.insufficient_sleep_days} day(s) with short sleep (under 6 h)",
+            )
+        )
     if not findings:
-        findings.append("睡眠は良好な状態です")
+        findings.append(_t(locale, "睡眠は良好な状態です", "Sleep looks good"))
     return AnalysisResult(score=score, findings=findings)
 
 
-def analyze_workout(f: WorkoutFeatures) -> AnalysisResult:
+def analyze_workout(f: WorkoutFeatures, locale: str = "ja") -> AnalysisResult:
     if f.session_count == 0:
-        return AnalysisResult(score=50.0, findings=["運動記録が不足しているため評価できません"])
+        return AnalysisResult(
+            score=50.0,
+            findings=[
+                _t(
+                    locale,
+                    "運動記録が不足しているため評価できません",
+                    "Not enough workout records to evaluate",
+                )
+            ],
+        )
     missing = max(0, 3 - f.session_count)  # 目安は週3回
     findings = (
-        [f"週あたりの運動回数が目安(3回)より{missing}回少ないです"]
+        [
+            _t(
+                locale,
+                f"週あたりの運動回数が目安(3回)より{missing}回少ないです",
+                f"Workout frequency is {missing} session(s) below the guideline (3 per week)",
+            )
+        ]
         if missing > 0
-        else ["運動頻度は目安を満たしています"]
+        else [_t(locale, "運動頻度は目安を満たしています", "Workout frequency meets the guideline")]
     )
     if f.total_strength_volume_kg > 0:
-        findings.append(f"筋力トレーニングの総ボリューム: {f.total_strength_volume_kg:.0f}kg")
+        findings.append(
+            _t(
+                locale,
+                f"筋力トレーニングの総ボリューム: {f.total_strength_volume_kg:.0f}kg",
+                f"Total strength-training volume: {f.total_strength_volume_kg:.0f} kg",
+            )
+        )
     return AnalysisResult(score=clamp_score(100.0 - missing * 15.0), findings=findings)
 
 

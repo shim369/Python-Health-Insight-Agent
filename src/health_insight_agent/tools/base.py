@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -25,6 +26,16 @@ from health_insight_agent.logging_config import get_logger
 from health_insight_agent.services.insight_data_service import InvalidRequestError
 
 logger = get_logger(__name__)
+
+_LOCALE: ContextVar[str] = ContextVar("tool_locale", default="ja")
+
+
+def current_locale() -> str:
+    """いま実行中のツール呼び出しの言語(ja/en)。ツールが返す文章(所見・理由・ラベル)に使う。
+
+    引数ではなくcontextvarで渡すのは、ツールの引数スキーマ(LLMに見せる)に言語を混ぜず、
+    スレッドをまたいでも呼び出しごとに独立させるため。"""
+    return _LOCALE.get()
 
 
 class ToolArgs(BaseModel):
@@ -127,8 +138,19 @@ class ToolRegistry:
     def close(self) -> None:
         """ToolExecutor Protocol用。直接呼び出しは解放するものが無い。"""
 
-    def execute(self, user_id: UUID, name: str, arguments: dict[str, Any]) -> ToolExecution:
+    def execute(
+        self, user_id: UUID, name: str, arguments: dict[str, Any], locale: str = "ja"
+    ) -> ToolExecution:
         started = time.perf_counter()
+        token = _LOCALE.set(locale)
+        try:
+            return self._execute(user_id, name, arguments, started)
+        finally:
+            _LOCALE.reset(token)
+
+    def _execute(
+        self, user_id: UUID, name: str, arguments: dict[str, Any], started: float
+    ) -> ToolExecution:
 
         def done(
             ok: bool,

@@ -14,7 +14,7 @@ import json
 import threading
 import time
 from concurrent.futures import Future
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from mcp import types
@@ -105,7 +105,9 @@ class McpToolExecutor:
         self._ensure_started()
         return list(self._specs)
 
-    def execute(self, user_id: UUID, name: str, arguments: dict[str, Any]) -> ToolExecution:
+    def execute(
+        self, user_id: UUID, name: str, arguments: dict[str, Any], locale: str = "ja"
+    ) -> ToolExecution:
         started = time.perf_counter()
 
         def fail(msg: str) -> ToolExecution:
@@ -124,7 +126,8 @@ class McpToolExecutor:
             self._ensure_started()
             assert self._loop is not None and self._client is not None
             future: Future[types.CallToolResult] = asyncio.run_coroutine_threadsafe(
-                self._client.call_tool(name, arguments), self._loop
+                self._client.call_tool(name, arguments, meta=cast(Any, {"locale": locale})),
+                self._loop,
             )
             result = future.result(timeout=CALL_TIMEOUT_SECONDS)
         except Exception:

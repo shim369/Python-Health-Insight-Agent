@@ -50,6 +50,7 @@ class MLEvaluationResult:
     is_overfitting: bool
     adopted: bool
     reason: str
+    reason_en: str = ""
 
 
 def evaluate(
@@ -85,16 +86,27 @@ def evaluate(
     if overfit:
         adopted = False
         reason = f"過学習チェックに抵触(乖離{gap:.0%} > {OVERFIT_GAP_THRESHOLD:.0%})のため見送り"
+        reason_en = (
+            f"Rejected by the overfitting check (gap {gap:.0%} > {OVERFIT_GAP_THRESHOLD:.0%})"
+        )
     elif improvement >= IMPROVEMENT_THRESHOLD:
         adopted = True
         reason = (
             f"Baseline({baseline_name})比で{improvement:.1%}改善、乖離{gap:.0%}。採用基準を満たす"
+        )
+        reason_en = (
+            f"{improvement:.1%} better than the baseline ({baseline_name}), gap {gap:.0%}; "
+            "meets the adoption criteria"
         )
     else:
         adopted = False
         reason = (
             f"Baseline比の改善率{improvement:.1%}が基準"
             f"({IMPROVEMENT_THRESHOLD:.0%})未満のため見送り"
+        )
+        reason_en = (
+            f"Rejected: improvement over the baseline ({improvement:.1%}) is below the "
+            f"{IMPROVEMENT_THRESHOLD:.0%} criterion"
         )
     return MLEvaluationResult(
         n_samples=len(samples),
@@ -110,4 +122,5 @@ def evaluate(
         is_overfitting=overfit,
         adopted=adopted,
         reason=reason,
+        reason_en=reason_en,
     )

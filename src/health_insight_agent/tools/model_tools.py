@@ -19,7 +19,7 @@ from health_insight_agent.ml.features import (
 from health_insight_agent.ml.model_registry import ModelDecision
 from health_insight_agent.ml.service import PredictionConditions, SleepModelService
 from health_insight_agent.tools import charts
-from health_insight_agent.tools.base import Tool, ToolArgs, ToolOutput
+from health_insight_agent.tools.base import Tool, ToolArgs, ToolOutput, current_locale
 
 REFERENCE_LABEL = charts.tr("モデルによる参考値", "Model-based reference value")
 DISCLAIMER = (
@@ -57,13 +57,13 @@ class _NoArgs(ToolArgs):
     pass
 
 
-def _decision_json(d: ModelDecision) -> dict[str, Any]:
+def _decision_json(d: ModelDecision, locale: str) -> dict[str, Any]:
     def r(v: float | None, n: int = 3) -> float | None:
         return None if v is None else round(v, n)
 
     return {
         "adopted": d.adopted,
-        "reason": d.reason,
+        "reason": d.localized_reason(locale),
         "mae_minutes": r(d.mae_minutes, 1),
         "baseline": d.baseline_name,
         "baseline_mae_minutes": r(d.baseline_mae_minutes, 1),
@@ -89,10 +89,11 @@ def build_model_tools(service: SleepModelService) -> list[Tool]:
             ),
         )
         d = res.decision
+        locale = current_locale()
         data: dict[str, Any] = {
             "model_used": res.model_used,
             "reference_only": True,
-            "model": _decision_json(d),
+            "model": _decision_json(d, locale),
             "inputs_used": {k: round(v, 2) for k, v in res.inputs.items()},
             "defaulted_inputs": res.defaulted,
         }
@@ -144,7 +145,8 @@ def build_model_tools(service: SleepModelService) -> list[Tool]:
     def explain(user_id: UUID, _: _NoArgs) -> ToolOutput:
         res = service.factors(user_id)
         d = res.decision
-        data: dict[str, Any] = {"model_used": res.model_used, "model": _decision_json(d)}
+        locale = current_locale()
+        data: dict[str, Any] = {"model_used": res.model_used, "model": _decision_json(d, locale)}
         notes = [
             "importance = how much the model used a feature to predict; it is NOT a causal effect",
         ]
@@ -153,7 +155,9 @@ def build_model_tools(service: SleepModelService) -> list[Tool]:
             data["factors"] = [
                 {
                     "feature": name,
-                    "label": FEATURE_LABELS_JA.get(name, name),
+                    "label": (FEATURE_LABELS_EN if locale == "en" else FEATURE_LABELS_JA).get(
+                        name, name
+                    ),
                     "importance": round(share, 3),
                 }
                 for name, share in res.factors
@@ -179,7 +183,7 @@ def build_model_tools(service: SleepModelService) -> list[Tool]:
             data["fallback_correlations"] = [
                 {
                     "feature": n,
-                    "label": FEATURE_LABELS_JA.get(n, n),
+                    "label": (FEATURE_LABELS_EN if locale == "en" else FEATURE_LABELS_JA).get(n, n),
                     "pearson_r": round(r, 3),
                     "n": cnt,
                     "interpretation": interp,

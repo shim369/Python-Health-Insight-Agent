@@ -38,8 +38,11 @@ def build_mcp_server(executor: ToolExecutor, user_id: UUID) -> Server:
         ctx: object, params: types.CallToolRequestParams
     ) -> types.CallToolResult:
         # ツールは同期(DB待ち)。イベントループを塞がないようスレッドで実行する。
+        # 言語は、引数(LLMに見せるスキーマ)ではなくリクエストの_metaで受け取る
+        meta = params.meta or {}
+        locale = str(meta.get("locale", "ja")) if hasattr(meta, "get") else "ja"
         execution = await anyio.to_thread.run_sync(
-            executor.execute, user_id, params.name, dict(params.arguments or {})
+            executor.execute, user_id, params.name, dict(params.arguments or {}), locale
         )
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=json.dumps(execution.content))],

@@ -35,6 +35,11 @@ class ModelDecision:
     improvement_rate: float | None = None
     overfit_gap: float | None = None
     feature_importance: dict[str, float] = field(default_factory=dict)
+    reason_en: str = ""
+    """reasonの英語版(英語UI向け)。古い保存ファイルには無いので既定は空。"""
+
+    def localized_reason(self, locale: str) -> str:
+        return self.reason_en if locale == "en" and self.reason_en else self.reason
 
 
 class ModelRegistry:

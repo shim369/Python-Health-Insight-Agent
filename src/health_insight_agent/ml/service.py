@@ -141,11 +141,12 @@ class SleepModelService:
         samples, quality = F.build_samples(rows)
         trained_at = self._now().isoformat(timespec="seconds")
 
-        def make(adopted: bool, reason: str, **metrics: object) -> ModelDecision:
+        def make(adopted: bool, reason: str, reason_en: str, **metrics: object) -> ModelDecision:
             return ModelDecision(
                 domain="sleep",
                 adopted=adopted,
                 reason=reason,
+                reason_en=reason_en,
                 total_days=quality.total_days,
                 usable_samples=quality.usable_samples,
                 missing_rate=quality.missing_rate,
@@ -158,7 +159,7 @@ class SleepModelService:
         predictor: Predictor | None = None
         if not quality.is_sufficient:
             # 評価を待たずに見送り(既存アプリの方針): 統計にフォールバックする
-            decision = make(False, quality.reason)
+            decision = make(False, quality.reason, quality.reason_en)
         else:
             try:
                 evaluation = evaluate(samples, self._train_predict)
@@ -168,6 +169,7 @@ class SleepModelService:
                 decision = make(
                     evaluation.adopted,
                     evaluation.reason,
+                    evaluation.reason_en,
                     mae_minutes=evaluation.model_val_mae,
                     baseline_name=evaluation.baseline_name,
                     baseline_mae_minutes=evaluation.baseline_mae,
@@ -179,7 +181,11 @@ class SleepModelService:
                 # 学習・推論の失敗でも回答は止めず、モデルを使わない(Fallback)
                 logger.exception("sleep model evaluation failed")
                 predictor, evaluation = None, None
-                decision = make(False, "モデルの学習・評価でエラーが発生したため使用しません")
+                decision = make(
+                    False,
+                    "モデルの学習・評価でエラーが発生したため使用しません",
+                    "Not used: an error occurred while training or evaluating the model",
+                )
         self._registry.save(user_id, decision)
         self._tracker.log_decision(
             user_key(user_id),

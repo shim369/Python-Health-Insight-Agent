@@ -45,14 +45,14 @@ class HealthReport:
 
 
 class HealthInsightPort(Protocol):
-    def report(self, user_id: UUID, as_of: date) -> HealthReport: ...
+    def report(self, user_id: UUID, as_of: date, locale: str = "ja") -> HealthReport: ...
 
 
 class LocalHealthInsightService:
     def __init__(self, uow_factory: Callable[[], UnitOfWork]) -> None:
         self._uow_factory = uow_factory
 
-    def report(self, user_id: UUID, as_of: date) -> HealthReport:
+    def report(self, user_id: UUID, as_of: date, locale: str = "ja") -> HealthReport:
         recent_start, recent_end = local_day_range(as_of - timedelta(days=_RECENT_DAYS - 1), as_of)
         weight_start, _ = local_day_range(as_of - timedelta(days=_WEIGHT_DAYS - 1), as_of)
         with self._uow_factory() as uow:
@@ -61,10 +61,10 @@ class LocalHealthInsightService:
             workouts = uow.workout_logs.list_between(user_id, recent_start, recent_end)
             weights = uow.weight_logs.list_between(user_id, weight_start, recent_end)
         score = compute_health_score(
-            nutrition=analyze_nutrition(compute_nutrition_features(meals)),
-            weight=analyze_weight(compute_weight_features(weights)),
-            sleep=analyze_sleep(compute_sleep_features(sleeps)),
-            workout=analyze_workout(compute_workout_features(workouts)),
+            nutrition=analyze_nutrition(compute_nutrition_features(meals), locale),
+            weight=analyze_weight(compute_weight_features(weights), locale),
+            sleep=analyze_sleep(compute_sleep_features(sleeps), locale),
+            workout=analyze_workout(compute_workout_features(workouts), locale),
         )
         return HealthReport(
             as_of=as_of, health_score=score, recommendations=generate_recommendations(score)

@@ -151,7 +151,7 @@ class HealthInsightAgent:
                     }
                     results.append(ToolResultPart(call.id, call.name, content))
                     continue
-                execution = self._registry.execute(user_id, call.name, call.arguments)
+                execution = self._registry.execute(user_id, call.name, call.arguments, locale.value)
                 trace.append(execution)
                 results.append(ToolResultPart(call.id, call.name, execution.content))
             messages.append(Message("tool", tool_results=tuple(results)))

@@ -83,6 +83,7 @@ class DataQualityReport:
     missing_rate: float
     is_sufficient: bool
     reason: str
+    reason_en: str = ""
 
 
 def _mean(values: Sequence[float | None]) -> float | None:
@@ -151,18 +152,21 @@ def build_samples(rows: Sequence[DayRow]) -> tuple[list[SleepSample], DataQualit
         samples.append(SleepSample(r.date, feats, r.sleep_duration_min, baseline))
     missing_rate = 1 - len(samples) / total if total else 1.0
     if total == 0:
-        reason = "データが0日分です"
-        ok = False
+        ok, reason, reason_en = False, "データが0日分です", "No data (0 days)"
     elif total < MIN_DAYS:
+        ok = False
         reason = f"データ量が不足しています({total}日 < 最低{MIN_DAYS}日)"
-        ok = False
+        reason_en = f"Not enough data ({total} days < minimum {MIN_DAYS} days)"
     elif missing_rate >= MAX_MISSING_RATE:
+        ok = False
         reason = f"欠損率が高すぎます({missing_rate:.0%} >= {MAX_MISSING_RATE:.0%})"
-        ok = False
+        reason_en = f"Missing rate is too high ({missing_rate:.0%} >= {MAX_MISSING_RATE:.0%})"
     elif len(samples) < MIN_SAMPLES:
-        reason = f"使えるサンプルが少なすぎます({len(samples)} < {MIN_SAMPLES})"
         ok = False
+        reason = f"使えるサンプルが少なすぎます({len(samples)} < {MIN_SAMPLES})"
+        reason_en = f"Too few usable samples ({len(samples)} < {MIN_SAMPLES})"
     else:
-        reason = "データ量・欠損率は基準を満たしています"
         ok = True
-    return samples, DataQualityReport(total, len(samples), missing_rate, ok, reason)
+        reason = "データ量・欠損率は基準を満たしています"
+        reason_en = "Data volume and missing rate meet the criteria"
+    return samples, DataQualityReport(total, len(samples), missing_rate, ok, reason, reason_en)
