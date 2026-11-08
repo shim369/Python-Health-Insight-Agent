@@ -33,36 +33,32 @@ language they were asked in.
 
 ## Screenshots
 
-All screenshots use **synthetic data**. Images 2–5 are real answers from **Gemini (`gemini-3.6-flash`)**; the start
-screen does not depend on the model; the prediction card (image 6) was captured earlier with the keyless demo LLM
-(`AI_PROVIDER=fake`).
+All screenshots use **synthetic data** and show the English UI (the Japanese UI is shown in [README.ja.md](README.ja.md)).
+Images 2–4 are real answers from **Gemini (`gemini-3.6-flash`)**; the start screen does not depend on the model; the
+prediction card (image 5) was captured with the keyless demo LLM (`AI_PROVIDER=fake`).
 
-**1. Start screen** (Japanese UI): suggested questions, a full-width header, the language toggle and the *New chat* button.
+**1. Start screen**: suggested questions, the language toggle and the *New chat* button.
 
-![Start screen](docs/images/01-start-ja.jpg)
+![Start screen](docs/images/01-start-en.jpg)
 
 **2. Gemini's answer**: the model chose its own tools; light Markdown (bold, bullets) is rendered, sleep is reported in
 hours, and every number comes from a tool result.
 
-![Gemini's answer in the chat](docs/images/02-answer-ja-gemini.jpg)
+![Gemini's answer in the chat](docs/images/02-answer-en-gemini.jpg)
 
 **3. The charts its tool calls produced**: scatter plots (two clear groups by last-meal time) and bars in hours.
 
-![Charts produced by the tool calls](docs/images/03-charts-ja-gemini.jpg)
+![Charts produced by the tool calls](docs/images/03-charts-en-gemini.jpg)
 
 **4. Finding cards right below the charts**: a strength meter, the correlation `r`, the number of records and the
 reliability; then a group comparison table with a verdict per row.
 
-![Finding cards and group comparison](docs/images/04-findings-ja-gemini.jpg)
+![Finding cards and group comparison](docs/images/04-findings-en-gemini.jpg)
 
-**5. The same in English** (everything, including the card texts and units, switches language):
-
-![Finding cards in English](docs/images/05-findings-en-gemini.jpg)
-
-**6. Prediction from the custom model** (keyless demo LLM): always labelled *Model-based reference value*, with the
+**5. Prediction from the custom model** (keyless demo LLM): always labelled *Model-based reference value*, with the
 model's error (MAE) and its improvement over the baseline.
 
-![Predicted sleep with the reference-value label](docs/images/06-prediction-en-demo.jpg)
+![Predicted sleep with the reference-value label](docs/images/05-prediction-en-demo.jpg)
 
 ## Highlights
 
